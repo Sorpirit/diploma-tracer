@@ -17,3 +17,7 @@ Dependancies:
 Learing resources:
 https://vulkan-tutorial.com/Development_environment
 https://mesonbuild.com/Tutorial.html 
+
+# Building
+1. meson setup Build --buildtype=release --backend vs2022
+2. meson compile -C Build
