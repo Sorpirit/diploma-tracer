@@ -1,11 +1,11 @@
 {
     "configurations": [
         {
-            "name": "Win32",
+            "name": "Win64",
             "includePath": [
                 "${workspaceFolder}/**",
-                "C:/Users/danvu/Documents/Projects/diploma-tracer/Libraries/glfw-3.4.bin.WIN64/include/GLFW",
-                "C:/Users/danvu/Documents/Projects/diploma-tracer/Libraries/glm-1.0.1"
+                "${workspaceFolder}/Libraries/glm-1.0.1/**",
+                "${workspaceFolder}/Libraries/glfw-3.4.bin.WIN64/include/**"
             ],
             "defines": [
                 "_DEBUG",

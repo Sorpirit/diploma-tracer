@@ -1,1 +1,2 @@
 subdir('TracerCore')
+subdir('TracerUtils')
