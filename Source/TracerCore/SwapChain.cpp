@@ -11,13 +11,18 @@
 namespace TraceCore
 {
     SwapChain::SwapChain(VulkanDevice &deviceRef, VkExtent2D extent) : 
-        _device{deviceRef}, windowExtent{extent} {
-        createSwapChain();
-        createImageViews();
-        createRenderPass();
-        createDepthResources();
-        createFramebuffers();
-        createSyncObjects();
+        _device{deviceRef}, windowExtent{extent} 
+    {
+        Init();
+    }
+
+    SwapChain::SwapChain(VulkanDevice &deviceRef, VkExtent2D extent, std::shared_ptr<SwapChain> previous)  : 
+        _device{deviceRef}, windowExtent{extent}, _oldSwapChain{previous}
+    {
+        Init();
+
+        // invalidate old swapchain
+        _oldSwapChain = nullptr;
     }
 
     SwapChain::~SwapChain() {
@@ -120,7 +125,17 @@ namespace TraceCore
         return result;
     }
 
-    void SwapChain::createSwapChain() 
+    void SwapChain::Init()
+    {
+        createSwapChain();
+        createImageViews();
+        createRenderPass();
+        createDepthResources();
+        createFramebuffers();
+        createSyncObjects();
+    }
+
+    void SwapChain::createSwapChain()
     {
         SwapChainSupportDetails swapChainSupport = _device.getSwapChainSupport();
 
@@ -164,7 +179,7 @@ namespace TraceCore
         createInfo.presentMode = presentMode;
         createInfo.clipped = VK_TRUE;
 
-        createInfo.oldSwapchain = VK_NULL_HANDLE;
+        createInfo.oldSwapchain = _oldSwapChain == nullptr ? VK_NULL_HANDLE : _oldSwapChain->swapChain;
 
         if (vkCreateSwapchainKHR(_device.GetVkDevice(), &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
             throw std::runtime_error("failed to create swap chain!");
@@ -365,7 +380,7 @@ namespace TraceCore
     VkSurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(
         const std::vector<VkSurfaceFormatKHR> &availableFormats) {
     for (const auto &availableFormat : availableFormats) {
-        if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM &&
+        if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
             availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
         return availableFormat;
         }

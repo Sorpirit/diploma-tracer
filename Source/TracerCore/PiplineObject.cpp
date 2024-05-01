@@ -25,23 +25,17 @@ namespace TraceCore
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipline);
     }
 
-    PipelineConfiguration PipelineObject::GetDefaultConfiguration(uint32_t width, uint32_t height)
+    void PipelineObject::GetDefaultConfiguration(PipelineConfiguration& config)
     {
-        PipelineConfiguration config{};
-
         config.InputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
         config.InputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         config.InputAssembly.primitiveRestartEnable = VK_FALSE;
 
-        config.Viewport.x = 0.0f;
-        config.Viewport.y = 0.0f;
-        config.Viewport.width = static_cast<float>(width);
-        config.Viewport.height = static_cast<float>(height);
-        config.Viewport.minDepth = 0.0f;
-        config.Viewport.maxDepth = 1.0f;
-        
-        config.Scissor.offset = {0, 0};
-        config.Scissor.extent = {width, height};
+        config.ViewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        config.ViewportInfo.viewportCount = 1;
+        config.ViewportInfo.scissorCount = 1;
+        config.ViewportInfo.pScissors = nullptr;
+        config.ViewportInfo.pViewports = nullptr;
         
         config.Rasterization.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
         config.Rasterization.depthClampEnable = VK_FALSE;
@@ -95,7 +89,12 @@ namespace TraceCore
         config.DepthStencil.front = {};  // Optional
         config.DepthStencil.back = {};   // Optional
 
-        return config;
+        config.DynamicStateEnables = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+        config.DynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+        config.DynamicState.dynamicStateCount = static_cast<uint32_t>(config.DynamicStateEnables.size());
+        config.DynamicState.pDynamicStates = config.DynamicStateEnables.data();
+        config.DynamicState.flags = 0;
+
     }
 
     void PipelineObject::CreateGraphicsPipeline(const PipelineConfiguration &config, const std::string &vertexShaderPath, const std::string &fragmentShaderPath)
@@ -133,17 +132,10 @@ namespace TraceCore
         auto attributeDescriptions = Vertex::GetAttributeDescriptions();
         VkPipelineVertexInputStateCreateInfo vertexInput{};
         vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertexInput.vertexAttributeDescriptionCount = 1;
-        vertexInput.vertexBindingDescriptionCount = 1;
+        vertexInput.vertexAttributeDescriptionCount = attributeDescriptions.size();
+        vertexInput.vertexBindingDescriptionCount = bindingDescription.size();
         vertexInput.pVertexAttributeDescriptions = attributeDescriptions.data();
         vertexInput.pVertexBindingDescriptions = bindingDescription.data();
-
-        VkPipelineViewportStateCreateInfo viewportInfo{};
-        viewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-        viewportInfo.viewportCount = 1;
-        viewportInfo.pViewports = &config.Viewport;
-        viewportInfo.scissorCount = 1;
-        viewportInfo.pScissors = &config.Scissor;
 
         VkGraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -151,12 +143,12 @@ namespace TraceCore
         pipelineInfo.pStages = shaderStages;
         pipelineInfo.pVertexInputState = &vertexInput;
         pipelineInfo.pInputAssemblyState = &config.InputAssembly;
-        pipelineInfo.pViewportState = &viewportInfo;
+        pipelineInfo.pViewportState = &config.ViewportInfo;
         pipelineInfo.pRasterizationState = &config.Rasterization;
         pipelineInfo.pMultisampleState = &config.Multisample;
         pipelineInfo.pColorBlendState = &config.ColorBlend;
         pipelineInfo.pDepthStencilState = &config.DepthStencil;
-        pipelineInfo.pDynamicState = nullptr;
+        pipelineInfo.pDynamicState = &config.DynamicState;
 
         pipelineInfo.layout = config.PipelineLayout;
         pipelineInfo.renderPass = config.RenderPass;

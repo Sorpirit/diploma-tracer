@@ -18,7 +18,7 @@ namespace TraceCore
     {
         LoadModels();
         CreatePipelineLayout();
-        CreatePipeline();
+        RecreateSwapChain();
         CreateCommandBuffers();
     }
 
@@ -41,12 +41,32 @@ namespace TraceCore
         vkDeviceWaitIdle(_device.GetVkDevice());
     }
 
+    // static void GereneateSerpinskyTrangle(std::vector<Vertex>& vertices, int depth, int offset)
+    // {
+    //     if(depth == 0) {
+    //         return;
+    //     }
+
+    //     if(depth == 1) {
+    //         Vertex n1 = {(vertices[offset].position + vertices[offset + 1].position) / 2.0f};
+    //         Vertex n2 = {(vertices[offset + 1].position + vertices[offset + 2].position) / 2.0f};
+    //         Vertex n3 = {(vertices[offset].position + vertices[offset + 2].position) / 2.0f};
+
+    //         vertices.push_back(vertices[offset]);
+
+    //         vertices.push_back(vertices[offset]);
+    //         vertices.push_back(vertices[offset + 1]);
+    //         vertices.push_back(vertices[offset + 2]);
+    //         return;
+    //     }
+    // }
+
     void Tracer::LoadModels()
     {
         std::vector<Vertex> vertices = {
-            {{0.0f, -0.5f}},
-            {{0.5f, 0.5f}},
-            {{-0.5f, 0.5f}}
+            {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+            {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+            {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
         };
 
         _model = std::make_unique<Model>(_device, vertices);
@@ -69,9 +89,13 @@ namespace TraceCore
     
     void Tracer::CreatePipeline()
     {
-        auto pipelineConfig = PipelineObject::GetDefaultConfiguration(_swapChain.width(), _swapChain.height());
+        assert(_swapChain != nullptr && "Unable to create pipeline while swap chain is not created");
+        assert(_pipelineLayout != nullptr && "Unable to create pipeline while pipeline layout is not created");
 
-        pipelineConfig.RenderPass = _swapChain.getRenderPass();
+        PipelineConfiguration pipelineConfig{};
+        PipelineObject::GetDefaultConfiguration(pipelineConfig);
+
+        pipelineConfig.RenderPass = _swapChain->getRenderPass();
         pipelineConfig.PipelineLayout = _pipelineLayout;
 
         _pipline = std::make_unique<PipelineObject>(_device, pipelineConfig, "PrecompiledShaders\\Flat.vert.spv", "PrecompiledShaders\\Flat.frag.spv");
@@ -79,7 +103,7 @@ namespace TraceCore
     
     void Tracer::CreateCommandBuffers()
     {
-        _commandBuffers.resize(_swapChain.imageCount());
+        _commandBuffers.resize(_swapChain->imageCount());
 
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -90,58 +114,114 @@ namespace TraceCore
         if(vkAllocateCommandBuffers(_device.GetVkDevice(), &allocInfo, _commandBuffers.data()) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate command buffers!");
         }
-
-        for (size_t i = 0; i < _commandBuffers.size(); i++) {
-            VkCommandBufferBeginInfo beginInfo{};
-            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-            if(vkBeginCommandBuffer(_commandBuffers[i], &beginInfo) != VK_SUCCESS) {
-                throw std::runtime_error("failed to begin recording command buffer!");
-            }
-
-            VkRenderPassBeginInfo renderPassInfo{};
-            renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            renderPassInfo.renderPass = _swapChain.getRenderPass();
-            renderPassInfo.framebuffer = _swapChain.getFrameBuffer(i);
-
-            renderPassInfo.renderArea.offset = {0, 0};
-            renderPassInfo.renderArea.extent = _swapChain.getSwapChainExtent();
-
-            std::array<VkClearValue, 2> clearValues{};
-            clearValues[0].color = {1.0f, 1.0f, 1.0f, 1.0f};
-            clearValues[1].depthStencil = {1.0f, 0};
-
-            renderPassInfo.clearValueCount = clearValues.size();
-            renderPassInfo.pClearValues = clearValues.data();
-
-            vkCmdBeginRenderPass(_commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-            _pipline->Bind(_commandBuffers[i]);
-            _model->Bind(_commandBuffers[i]);
-
-            _model->Draw(_commandBuffers[i]);
-
-            vkCmdEndRenderPass(_commandBuffers[i]);
-
-            if(vkEndCommandBuffer(_commandBuffers[i]) != VK_SUCCESS) {
-                throw std::runtime_error("failed to record command buffer!");
-            }
-        }
     }
     
     void Tracer::DrawFrame()
     {
         uint32_t imageIndex;
-        auto result = _swapChain.acquireNextImage(&imageIndex);
+        auto result = _swapChain->acquireNextImage(&imageIndex);
+
+        if(result == VK_ERROR_OUT_OF_DATE_KHR) {
+            RecreateSwapChain();
+            return;
+        }
 
         if(result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
             throw std::runtime_error("failed to acquire swap chain image!");
         }
 
-        result = _swapChain.submitCommandBuffers(&_commandBuffers[imageIndex], &imageIndex);
+        RecordCommandBuffer(imageIndex);
+        result = _swapChain->submitCommandBuffers(&_commandBuffers[imageIndex], &imageIndex);
+
+        if(result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || _mainWindow.FramebufferResized()) {
+            _mainWindow.ResetFramebufferResizedFlag();
+            RecreateSwapChain();
+            return;
+        }
 
         if(result != VK_SUCCESS) {
             throw std::runtime_error("failed to present swap chain image!");
         }
+    }
+
+    void Tracer::RecreateSwapChain()
+    {
+        auto extent = _mainWindow.GetExtent();
+        while(extent.width == 0 || extent.height == 0) {
+            extent = _mainWindow.GetExtent();
+            glfwWaitEvents();
+        }
+
+        vkDeviceWaitIdle(_device.GetVkDevice());
+
+        if(_swapChain == nullptr)
+        {
+            _swapChain = std::make_unique<SwapChain>(_device, extent);
+        } else {
+            _swapChain = std::make_unique<SwapChain>(_device, extent, std::move(_swapChain));
+
+            if(_swapChain->imageCount() != _commandBuffers.size()) {
+                FreeCommandBuffers();
+                CreateCommandBuffers();
+            }
+        }
+        
+        CreatePipeline();
+    }
+
+    void Tracer::RecordCommandBuffer(int index)
+    {
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+        if(vkBeginCommandBuffer(_commandBuffers[index], &beginInfo) != VK_SUCCESS) {
+            throw std::runtime_error("failed to begin recording command buffer!");
+        }
+
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = _swapChain->getRenderPass();
+        renderPassInfo.framebuffer = _swapChain->getFrameBuffer(index);
+
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = _swapChain->getSwapChainExtent();
+
+        std::array<VkClearValue, 2> clearValues{};
+        clearValues[0].color = {1.0f, 1.0f, 1.0f, 1.0f};
+        clearValues[1].depthStencil = {1.0f, 0};
+
+        renderPassInfo.clearValueCount = clearValues.size();
+        renderPassInfo.pClearValues = clearValues.data();
+
+        vkCmdBeginRenderPass(_commandBuffers[index], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(_swapChain->width());
+        viewport.height = static_cast<float>(_swapChain->height());
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        VkRect2D scissor{{0, 0}, _swapChain->getSwapChainExtent()};
+        vkCmdSetViewport(_commandBuffers[index], 0, 1, &viewport);
+        vkCmdSetScissor(_commandBuffers[index], 0, 1, &scissor);
+        
+
+        _pipline->Bind(_commandBuffers[index]);
+        _model->Bind(_commandBuffers[index]);
+
+        _model->Draw(_commandBuffers[index]);
+
+        vkCmdEndRenderPass(_commandBuffers[index]);
+
+        if(vkEndCommandBuffer(_commandBuffers[index]) != VK_SUCCESS) {
+            throw std::runtime_error("failed to record command buffer!");
+        }
+    }
+    
+    void Tracer::FreeCommandBuffers()
+    {
+        vkFreeCommandBuffers(_device.GetVkDevice(), _device.getCommandPool(), static_cast<uint32_t>(_commandBuffers.size()), _commandBuffers.data());
+        _commandBuffers.clear();
     }
 }

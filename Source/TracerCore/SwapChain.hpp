@@ -8,6 +8,7 @@
 // std lib headers
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace TraceCore
 {
@@ -17,10 +18,11 @@ namespace TraceCore
         static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
         SwapChain(VulkanDevice &deviceRef, VkExtent2D windowExtent);
+        SwapChain(VulkanDevice &deviceRef, VkExtent2D windowExtent, std::shared_ptr<SwapChain> previous);
         ~SwapChain();
 
         SwapChain(const SwapChain &) = delete;
-        void operator=(const SwapChain &) = delete;
+        SwapChain operator=(const SwapChain &) = delete;
 
         inline VkFramebuffer getFrameBuffer(int index) { return swapChainFramebuffers[index]; }
         inline VkRenderPass getRenderPass() { return renderPass; }
@@ -38,6 +40,7 @@ namespace TraceCore
         VkResult submitCommandBuffers(const VkCommandBuffer *buffers, uint32_t *imageIndex);
 
     private:
+        void Init();
         void createSwapChain();
         void createImageViews();
         void createDepthResources();
@@ -46,10 +49,8 @@ namespace TraceCore
         void createSyncObjects();
 
         // Helper functions
-        VkSurfaceFormatKHR chooseSwapSurfaceFormat(
-        const std::vector<VkSurfaceFormatKHR> &availableFormats);
-        VkPresentModeKHR chooseSwapPresentMode(
-        const std::vector<VkPresentModeKHR> &availablePresentModes);
+        VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
+        VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
         VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
 
         VkFormat swapChainImageFormat;
@@ -68,6 +69,7 @@ namespace TraceCore
         VkExtent2D windowExtent;
 
         VkSwapchainKHR swapChain;
+        std::shared_ptr<SwapChain> _oldSwapChain;
 
         std::vector<VkSemaphore> imageAvailableSemaphores;
         std::vector<VkSemaphore> renderFinishedSemaphores;

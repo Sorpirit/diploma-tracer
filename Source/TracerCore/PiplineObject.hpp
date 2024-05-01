@@ -10,14 +10,18 @@ namespace TraceCore
 {
     struct PipelineConfiguration
     {
-        VkViewport Viewport;
-        VkRect2D Scissor;
+        PipelineConfiguration(const PipelineConfiguration&) = delete;
+        PipelineConfiguration operator=(const PipelineConfiguration&) = delete;
+
+        VkPipelineViewportStateCreateInfo ViewportInfo;
         VkPipelineInputAssemblyStateCreateInfo InputAssembly;
         VkPipelineRasterizationStateCreateInfo Rasterization;
         VkPipelineMultisampleStateCreateInfo Multisample;
         VkPipelineColorBlendAttachmentState ColorBlendAttachment;
         VkPipelineColorBlendStateCreateInfo ColorBlend;
         VkPipelineDepthStencilStateCreateInfo DepthStencil;
+        std::vector<VkDynamicState> DynamicStateEnables;
+        VkPipelineDynamicStateCreateInfo DynamicState;
         VkPipelineLayout PipelineLayout = nullptr;
         VkRenderPass RenderPass = nullptr;
         uint32_t Subpass = 0;
@@ -31,11 +35,11 @@ namespace TraceCore
         ~PipelineObject();
 
         PipelineObject(const PipelineObject&) = delete;
-        void operator=(const PipelineObject&) = delete;
+        PipelineObject operator=(const PipelineObject&) = delete;
         
         void Bind(VkCommandBuffer commandBuffer);
 
-        static PipelineConfiguration GetDefaultConfiguration(uint32_t width, uint32_t height);
+        static void GetDefaultConfiguration(PipelineConfiguration& config);
 
     private:
         void CreateGraphicsPipeline(const PipelineConfiguration& config, const std::string& vertexShaderPath, const std::string& fragmentShaderPath);

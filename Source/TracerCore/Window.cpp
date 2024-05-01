@@ -25,13 +25,24 @@ namespace TraceCore
         }
     }
 
+    void Window::FramebufferResizeCallback(GLFWwindow *window, int width, int height)
+    {
+        auto tracerWindow = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
+        tracerWindow->_framebufferResized = true;
+
+        tracerWindow->_width = width;
+        tracerWindow->_height = height;
+    }
+
     void Window::InitWindow()
     {
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
         _window = glfwCreateWindow(_width, _height, _windowName.c_str(), nullptr, nullptr);
+        glfwSetWindowUserPointer(_window, this);
+        glfwSetFramebufferSizeCallback(_window, FramebufferResizeCallback);
     }
 
 }

@@ -29,13 +29,16 @@ namespace TraceCore
         void LoadModels();
         void CreatePipelineLayout();
         void CreatePipeline();
-        void CreateCommandBuffers();
         void DrawFrame();
+        void RecreateSwapChain();
+        void CreateCommandBuffers();
+        void RecordCommandBuffer(int index);
+        void FreeCommandBuffers();
 
         Window _mainWindow{WIDTH, HEIGHT, "Hello Vulkan"};
         VulkanDevice _device{_mainWindow};
-        SwapChain _swapChain{_device, _mainWindow.GetExtent()};
 
+        std::unique_ptr<SwapChain> _swapChain;
         std::unique_ptr<PipelineObject> _pipline;
         VkPipelineLayout _pipelineLayout;
         std::vector<VkCommandBuffer> _commandBuffers;
