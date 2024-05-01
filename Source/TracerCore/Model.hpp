@@ -13,7 +13,7 @@ namespace TraceCore {
     struct Vertex {
         public:
             glm::vec2 position;
-            //glm::vec3 color;
+            glm::vec3 color;
 
             static std::vector<VkVertexInputBindingDescription> GetBindingDescription();
             static std::vector<VkVertexInputAttributeDescription> GetAttributeDescriptions();
@@ -25,7 +25,7 @@ namespace TraceCore {
             ~Model();
 
             Model(const Model&) = delete;
-            void operator=(const Model&) = delete;
+            Model operator=(const Model&) = delete;
 
             void Bind(VkCommandBuffer commandBuffer);
             void Draw(VkCommandBuffer commandBuffer);
