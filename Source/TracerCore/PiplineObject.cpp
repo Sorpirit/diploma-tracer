@@ -1,5 +1,6 @@
 #include "PiplineObject.hpp"
 #include "TracerIO.hpp"
+#include "Model.hpp"
 
 #include <iostream>
 #include <assert.h>
@@ -14,9 +15,9 @@ namespace TraceCore
 
     PipelineObject::~PipelineObject()
     {
-        vkDestroyShaderModule(_device.device(), _vertexShaderModule, nullptr);
-        vkDestroyShaderModule(_device.device(), _fragmentShaderModule, nullptr);
-        vkDestroyPipeline(_device.device(), _graphicsPipline, nullptr);
+        vkDestroyShaderModule(_device.GetVkDevice(), _vertexShaderModule, nullptr);
+        vkDestroyShaderModule(_device.GetVkDevice(), _fragmentShaderModule, nullptr);
+        vkDestroyPipeline(_device.GetVkDevice(), _graphicsPipline, nullptr);
     }
 
     void PipelineObject::Bind(VkCommandBuffer commandBuffer)
@@ -128,12 +129,14 @@ namespace TraceCore
         shaderStages[1].pNext = nullptr;
         shaderStages[1].pSpecializationInfo = nullptr;
 
+        auto bindingDescription = Vertex::GetBindingDescription();
+        auto attributeDescriptions = Vertex::GetAttributeDescriptions();
         VkPipelineVertexInputStateCreateInfo vertexInput{};
         vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertexInput.vertexAttributeDescriptionCount = 0;
-        vertexInput.vertexBindingDescriptionCount = 0;
-        vertexInput.pVertexAttributeDescriptions = nullptr;
-        vertexInput.pVertexBindingDescriptions = nullptr;
+        vertexInput.vertexAttributeDescriptionCount = 1;
+        vertexInput.vertexBindingDescriptionCount = 1;
+        vertexInput.pVertexAttributeDescriptions = attributeDescriptions.data();
+        vertexInput.pVertexBindingDescriptions = bindingDescription.data();
 
         VkPipelineViewportStateCreateInfo viewportInfo{};
         viewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -162,7 +165,7 @@ namespace TraceCore
         pipelineInfo.basePipelineIndex = -1;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-        if(vkCreateGraphicsPipelines(_device.device(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_graphicsPipline) != VK_SUCCESS){
+        if(vkCreateGraphicsPipelines(_device.GetVkDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_graphicsPipline) != VK_SUCCESS){
             throw std::runtime_error("failed to create graphics pipeline");
         }
     }
@@ -174,7 +177,7 @@ namespace TraceCore
         createInfo.codeSize = code.size();
         createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
-        if(vkCreateShaderModule(_device.device(), &createInfo, nullptr, shaderModule) != VK_SUCCESS) 
+        if(vkCreateShaderModule(_device.GetVkDevice(), &createInfo, nullptr, shaderModule) != VK_SUCCESS) 
         {
             throw std::runtime_error("failed to create shader module");
         }

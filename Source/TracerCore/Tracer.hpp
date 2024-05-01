@@ -8,6 +8,7 @@
 #include "VulkanDevice.hpp"
 #include "PiplineObject.hpp"
 #include "SwapChain.hpp"
+#include "Model.hpp"
 
 namespace TraceCore
 {
@@ -25,6 +26,7 @@ namespace TraceCore
 
         void Run();
     private:
+        void LoadModels();
         void CreatePipelineLayout();
         void CreatePipeline();
         void CreateCommandBuffers();
@@ -38,7 +40,7 @@ namespace TraceCore
         VkPipelineLayout _pipelineLayout;
         std::vector<VkCommandBuffer> _commandBuffers;
 
-        //PipelineObject _pipline{_device, PipelineObject::GetDefaultConfiguration(WIDTH, HEIGHT), "PrecompiledShaders\\Flat.vert.spv", "PrecompiledShaders\\Flat.frag.spv"};
+        std::unique_ptr<Model> _model;
     };
     
 }

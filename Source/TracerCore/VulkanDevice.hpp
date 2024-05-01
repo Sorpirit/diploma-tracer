@@ -23,7 +23,7 @@ namespace TraceCore {
     };
 
     class VulkanDevice {
-    public:
+        public:
         #ifdef NDEBUG
         const bool enableValidationLayers = false;
         #else
@@ -40,10 +40,10 @@ namespace TraceCore {
         VulkanDevice &operator=(VulkanDevice &&) = delete;
 
         VkCommandPool getCommandPool() { return commandPool; }
-        VkDevice device() { return device_; }
-        VkSurfaceKHR surface() { return surface_; }
-        VkQueue graphicsQueue() { return graphicsQueue_; }
-        VkQueue presentQueue() { return presentQueue_; }
+        VkDevice GetVkDevice() { return device_; }
+        VkSurfaceKHR GetSurface() { return surface_; }
+        VkQueue GetGraphicsQueue() { return graphicsQueue_; }
+        VkQueue GetPresentQueue() { return presentQueue_; }
 
         SwapChainSupportDetails getSwapChainSupport() { return querySwapChainSupport(physicalDevice); }
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
@@ -52,7 +52,7 @@ namespace TraceCore {
             const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
         // Buffer Helper Functions
-        void createBuffer(
+        void CreateBuffer(
             VkDeviceSize size,
             VkBufferUsageFlags usage,
             VkMemoryPropertyFlags properties,
@@ -60,7 +60,7 @@ namespace TraceCore {
             VkDeviceMemory &bufferMemory);
         VkCommandBuffer beginSingleTimeCommands();
         void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-        void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+        void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
         void copyBufferToImage(
             VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount);
 

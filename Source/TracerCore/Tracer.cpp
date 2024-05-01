@@ -16,6 +16,7 @@ namespace TraceCore
 {
     Tracer::Tracer()
     {
+        LoadModels();
         CreatePipelineLayout();
         CreatePipeline();
         CreateCommandBuffers();
@@ -23,7 +24,7 @@ namespace TraceCore
 
     Tracer::~Tracer()
     {
-        vkDestroyPipelineLayout(_device.device(), _pipelineLayout, nullptr);
+        vkDestroyPipelineLayout(_device.GetVkDevice(), _pipelineLayout, nullptr);
     }
 
     void Tracer::Run()
@@ -37,7 +38,18 @@ namespace TraceCore
             DrawFrame();
         }
 
-        vkDeviceWaitIdle(_device.device());
+        vkDeviceWaitIdle(_device.GetVkDevice());
+    }
+
+    void Tracer::LoadModels()
+    {
+        std::vector<Vertex> vertices = {
+            {{0.0f, -0.5f}},
+            {{0.5f, 0.5f}},
+            {{-0.5f, 0.5f}}
+        };
+
+        _model = std::make_unique<Model>(_device, vertices);
     }
 
     void Tracer::CreatePipelineLayout()
@@ -49,7 +61,7 @@ namespace TraceCore
         pipelineLayoutInfo.pSetLayouts = nullptr; // Optional
         pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
         pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
-        if(vkCreatePipelineLayout(_device.device(), &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS) {
+        if(vkCreatePipelineLayout(_device.GetVkDevice(), &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create pipeline layout!");
         }
 
@@ -75,7 +87,7 @@ namespace TraceCore
         allocInfo.commandPool = _device.getCommandPool();
         allocInfo.commandBufferCount = static_cast<uint32_t>(_commandBuffers.size());
 
-        if(vkAllocateCommandBuffers(_device.device(), &allocInfo, _commandBuffers.data()) != VK_SUCCESS) {
+        if(vkAllocateCommandBuffers(_device.GetVkDevice(), &allocInfo, _commandBuffers.data()) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate command buffers!");
         }
 
@@ -105,8 +117,9 @@ namespace TraceCore
             vkCmdBeginRenderPass(_commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
             _pipline->Bind(_commandBuffers[i]);
+            _model->Bind(_commandBuffers[i]);
 
-            vkCmdDraw(_commandBuffers[i], 3, 1, 0, 0);
+            _model->Draw(_commandBuffers[i]);
 
             vkCmdEndRenderPass(_commandBuffers[i]);
 

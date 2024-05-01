@@ -423,7 +423,7 @@ namespace TraceCore
         throw std::runtime_error("failed to find suitable memory type!");
     }
 
-    void VulkanDevice::createBuffer(
+    void VulkanDevice::CreateBuffer(
         VkDeviceSize size,
         VkBufferUsageFlags usage,
         VkMemoryPropertyFlags properties,
@@ -489,7 +489,7 @@ namespace TraceCore
         vkFreeCommandBuffers(device_, commandPool, 1, &commandBuffer);
     }
 
-    void VulkanDevice::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) 
+    void VulkanDevice::CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) 
     {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 

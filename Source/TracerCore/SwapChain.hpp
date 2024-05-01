@@ -64,7 +64,7 @@ namespace TraceCore
         std::vector<VkImage> swapChainImages;
         std::vector<VkImageView> swapChainImageViews;
 
-        VulkanDevice &device;
+        VulkanDevice& _device;
         VkExtent2D windowExtent;
 
         VkSwapchainKHR swapChain;
