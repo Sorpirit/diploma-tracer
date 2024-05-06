@@ -3,17 +3,23 @@
 #include <iostream>
 #include <stdexcept>
 #include <array>
+#include <vector>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/vec4.hpp>
-#include <glm/mat4x4.hpp>
+#include <glm/glm.hpp>
 
 #include "PiplineObject.hpp"
 
 
 namespace TraceCore
 {
+    struct SimplePushConstantData
+    {
+        glm::vec2 offset;
+        alignas(16) glm::vec3 color;
+    };
+
     Tracer::Tracer()
     {
         LoadModels();
@@ -74,13 +80,18 @@ namespace TraceCore
 
     void Tracer::CreatePipelineLayout()
     {
+        VkPushConstantRange pushConstantRange{};
+        pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        pushConstantRange.offset = 0;
+        pushConstantRange.size = sizeof(SimplePushConstantData);
+
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 0; // Optional
         pipelineLayoutInfo.pSetLayouts = nullptr; // Optional
-        pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
-        pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
+        pipelineLayoutInfo.pushConstantRangeCount = 1; // Optional
+        pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange; // Optional
         if(vkCreatePipelineLayout(_device.GetVkDevice(), &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create pipeline layout!");
         }
@@ -171,6 +182,8 @@ namespace TraceCore
 
     void Tracer::RecordCommandBuffer(int index)
     {
+        static int frame = 0;
+        frame = (frame + 1) % 1000;
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -206,11 +219,17 @@ namespace TraceCore
         vkCmdSetViewport(_commandBuffers[index], 0, 1, &viewport);
         vkCmdSetScissor(_commandBuffers[index], 0, 1, &scissor);
         
-
         _pipline->Bind(_commandBuffers[index]);
         _model->Bind(_commandBuffers[index]);
 
-        _model->Draw(_commandBuffers[index]);
+        for (int i = 0; i < 4; i++)
+        {
+            SimplePushConstantData push{};
+            push.offset = {0.0f, -0.4f + i * 0.25f};
+            push.color = {0.0f, 0.0f, 0.2f + i * 0.2f};
+            vkCmdPushConstants(_commandBuffers[index], _pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SimplePushConstantData), &push);
+            _model->Draw(_commandBuffers[index]);
+        }
 
         vkCmdEndRenderPass(_commandBuffers[index]);
 
