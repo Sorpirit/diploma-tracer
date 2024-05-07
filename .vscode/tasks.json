@@ -1,0 +1,55 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+      		"dependsOn": ["Meson Build", "Compile Shaders"],
+		},
+		{
+			"label": "Meson Build",
+			"type": "shell",
+			"command": "meson compile -C Build",
+			"problemMatcher": [
+				"$meson-gcc"
+			],
+			"group": {
+				"kind": "build"
+			},
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "Setup",
+			"type": "shell",
+			"command": "meson setup --backend vs Build",
+			"problemMatcher": [
+				"$meson-gcc"
+			],
+			"group": {
+				"kind": "build"
+			},
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "Compile Shaders",
+			"type": "shell",
+			"command": "python ${workspaceFolder}\\Assets\\Precompiler.py",
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": {
+				"kind": "build"
+			},
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		}
+	]
+}

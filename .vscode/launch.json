@@ -8,12 +8,13 @@
             "name": "(Windows) Tracer",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/builddir/Tracer.exe",
+            "program": "${workspaceFolder}/Build/Tracer.exe",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceRoot}/builddir",
+            "cwd": "${workspaceRoot}/Build",
             "environment": [],
-            //"console": "externalTerminal"
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build"
         }
 
     ]
