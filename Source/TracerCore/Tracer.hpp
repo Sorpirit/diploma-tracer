@@ -9,6 +9,7 @@
 #include "PiplineObject.hpp"
 #include "SwapChain.hpp"
 #include "Model.hpp"
+#include "Raytracer.hpp"
 
 namespace TraceCore
 {
@@ -42,6 +43,7 @@ namespace TraceCore
         std::unique_ptr<PipelineObject> _pipline;
         VkPipelineLayout _pipelineLayout;
         std::vector<VkCommandBuffer> _commandBuffers;
+        Raytracer _raytracer;
 
         std::unique_ptr<Model> _model;
     };

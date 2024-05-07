@@ -38,6 +38,20 @@
 			}
 		},
 		{
+			"label": "Wipe Setup",
+			"type": "shell",
+			"command": "meson setup --wipe --backend vs Build",
+			"problemMatcher": [
+				"$meson-gcc"
+			],
+			"group": {
+				"kind": "build"
+			},
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
 			"label": "Compile Shaders",
 			"type": "shell",
 			"command": "python ${workspaceFolder}\\Assets\\Precompiler.py",

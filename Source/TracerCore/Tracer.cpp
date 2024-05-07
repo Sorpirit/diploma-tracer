@@ -27,6 +27,7 @@ namespace TraceCore
         CreatePipelineLayout();
         RecreateSwapChain();
         CreateCommandBuffers();
+        _raytracer.LoadRaytracer(_device);
     }
 
     Tracer::~Tracer()

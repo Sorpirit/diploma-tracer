@@ -67,6 +67,13 @@
         "unordered_set": "cpp",
         "xhash": "cpp",
         "xtree": "cpp",
-        "array": "cpp"
+        "array": "cpp",
+        "cstdarg": "cpp",
+        "expected": "cpp",
+        "map": "cpp",
+        "unordered_map": "cpp",
+        "functional": "cpp",
+        "random": "cpp",
+        "span": "cpp"
     }
 }
