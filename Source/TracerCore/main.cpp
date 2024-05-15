@@ -9,7 +9,7 @@
 int main() {
     TracerUtils::IOHelpers::SetAssetFolder("..\\Assets");
 
-    TraceCore::Tracer engine{}; 
+    TracerCore::Tracer engine{}; 
     
     try
     {

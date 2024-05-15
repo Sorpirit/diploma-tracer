@@ -1,13 +1,14 @@
 import os
 import subprocess
 
-compiler_path = "C:\VulkanSDK\1.3.280.0\Bin\glslc.exe"
+compiler_path = "C:\\VulkanSDK\\1.3.280.0\\Bin\\glslc.exe"
 compiled_shader_postfix = ".spv"
 
 # Function to compile shader files
-def compile_shader(shader_file):
+def compile_shader(shader_file, compiled_shader_output):
     # Replace this command with your actual shell command for compiling shaders
-    compile_command = f"{compiler_path} {shader_file} -o {shader_file + compiled_shader_postfix}"
+    compile_command = f"\"{compiler_path}\" \"{shader_file}\" -o \"{compiled_shader_output}\""
+    print("Start compiling shader: " + shader_file)
     subprocess.run(compile_command, shell=True)
 
 # Path to the Shaders folder relative to this script
@@ -29,13 +30,13 @@ for shader_file in os.listdir(shaders_folder):
 
         # If shader file is newer than precompiled shader, compile it
         if shader_mtime > precompiled_mtime:
-            compile_shader(shader_path)
+            compile_shader(shader_path, precompiled_shader_path)
             print(f"Compiled {shader_file}")
         else:
             print(f"Up-to-date {shader_file}")
     else:
         # If precompiled shader doesn't exist, compile shader
-        compile_shader(shader_path)
+        compile_shader(shader_path, precompiled_shader_path)
         print(f"Compiled {shader_file}")
 
 print("Compilation complete")

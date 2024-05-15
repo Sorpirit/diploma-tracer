@@ -1,3 +1,4 @@
+#define STB_IMAGE_IMPLEMENTATION
 #include "TracerIO.hpp"
 
 #include <fstream>
@@ -24,5 +25,23 @@ namespace TracerUtils
         file.read(buffer->data(), fileSize);
 
         return std::move(buffer);
+    }
+
+    stbi_uc *IOHelpers::LoadImage(const std::string &filePath, int *width, int *height, int *channels, bool useAlphaChannel)
+    {
+        auto path = _assetFolder / std::filesystem::path(filePath);
+        stbi_uc* pixels = stbi_load(path.string().c_str(), width, height, channels, useAlphaChannel ? STBI_rgb_alpha : STBI_rgb);
+
+        if (!pixels) 
+        {
+            throw std::runtime_error("failed to load texture image!" + path.string());
+        }
+
+        return pixels;
+    }
+
+    void IOHelpers::FreeImage(stbi_uc *image)
+    {
+        stbi_image_free(image);
     }
 }

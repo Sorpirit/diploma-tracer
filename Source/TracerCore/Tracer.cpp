@@ -9,10 +9,10 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
-#include "PiplineObject.hpp"
+#include "GraphicsPipelineObject.hpp"
 
 
-namespace TraceCore
+namespace TracerCore
 {
     struct SimplePushConstantData
     {
@@ -23,9 +23,13 @@ namespace TraceCore
 
     Tracer::Tracer()
     {
-        LoadModels();
-        CreatePipelineLayout();
         RecreateSwapChain();
+        LoadModels();
+        LoadImages();
+        _shaderResourceManager = std::make_unique<ShaderReosuceManager>(_device, _swapChain->GetImageCount());
+        _shaderResourceManager->UploadTexture(_texture2d.get());
+        CreatePipelineLayout();
+        CreatePipeline();
         CreateCommandBuffers();
         _raytracer.LoadRaytracer(_device);
     }
@@ -49,26 +53,6 @@ namespace TraceCore
         vkDeviceWaitIdle(_device.GetVkDevice());
     }
 
-    // static void GereneateSerpinskyTrangle(std::vector<Vertex>& vertices, int depth, int offset)
-    // {
-    //     if(depth == 0) {
-    //         return;
-    //     }
-
-    //     if(depth == 1) {
-    //         Vertex n1 = {(vertices[offset].position + vertices[offset + 1].position) / 2.0f};
-    //         Vertex n2 = {(vertices[offset + 1].position + vertices[offset + 2].position) / 2.0f};
-    //         Vertex n3 = {(vertices[offset].position + vertices[offset + 2].position) / 2.0f};
-
-    //         vertices.push_back(vertices[offset]);
-
-    //         vertices.push_back(vertices[offset]);
-    //         vertices.push_back(vertices[offset + 1]);
-    //         vertices.push_back(vertices[offset + 2]);
-    //         return;
-    //     }
-    // }
-
     void Tracer::LoadModels()
     {
         std::vector<Vertex> vertices = {
@@ -80,20 +64,58 @@ namespace TraceCore
         _model = std::make_unique<Model>(_device, vertices);
     }
 
+    void Tracer::LoadImages()
+    {
+        _texture2d = Texture2D::LoadFileTexture("Textures\\cutecat.jpg", _device);
+
+        const uint32_t texWidth = 512;
+        const uint32_t texHeight = 512;
+
+        _computeTexture = Texture2D::CreateRuntimeTexture(texWidth, texHeight, 
+            VK_FORMAT_R8G8B8A8_UNORM, 
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT  | VK_IMAGE_USAGE_SAMPLED_BIT,
+            _device
+        );
+
+        VkDeviceSize imageSize = texWidth * texHeight * 4;
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        _device.CreateBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+        uint32_t imageData[texWidth * texHeight];
+
+        for (auto i = 0; i < texWidth; i++)
+        {
+            for (auto j = 0; j < texHeight; j++)
+            {
+                auto x = i / static_cast<float>(texWidth);
+                auto y = j / static_cast<float>(texHeight);
+                imageData[i + j * 500] = 0xff000000 | static_cast<uint32_t>(x * 255.0f) << 8 | static_cast<uint32_t>(y * 255.0f);
+            }
+        }
+
+        void* data;
+        vkMapMemory(_device.GetVkDevice(), stagingBufferMemory, 0, imageSize, 0, &data);
+            memcpy(data, imageData, static_cast<size_t>(imageSize));
+        vkUnmapMemory(_device.GetVkDevice(), stagingBufferMemory);
+
+        Texture2D::TransitionImageLayout(_computeTexture->GetImage(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _device);
+        Texture2D::CopyBufferToImage(stagingBuffer, _computeTexture->GetImage(), texWidth, texHeight, _device);
+        Texture2D::TransitionImageLayout(_computeTexture->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, _device);
+    
+        vkDestroyBuffer(_device.GetVkDevice(), stagingBuffer, nullptr);
+        vkFreeMemory(_device.GetVkDevice(), stagingBufferMemory, nullptr);
+    }
+
     void Tracer::CreatePipelineLayout()
     {
-        VkPushConstantRange pushConstantRange{};
-        pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-        pushConstantRange.offset = 0;
-        pushConstantRange.size = sizeof(SimplePushConstantData);
-
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = 0; // Optional
-        pipelineLayoutInfo.pSetLayouts = nullptr; // Optional
-        pipelineLayoutInfo.pushConstantRangeCount = 1; // Optional
-        pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange; // Optional
+        pipelineLayoutInfo.setLayoutCount = 1; // Optional
+        pipelineLayoutInfo.pSetLayouts = _shaderResourceManager->GetDescriptorSetLayout(); // Optional
+        pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
+        pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
         if(vkCreatePipelineLayout(_device.GetVkDevice(), &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create pipeline layout!");
         }
@@ -106,17 +128,18 @@ namespace TraceCore
         assert(_pipelineLayout != nullptr && "Unable to create pipeline while pipeline layout is not created");
 
         PipelineConfiguration pipelineConfig{};
-        PipelineObject::GetDefaultConfiguration(pipelineConfig);
+        GraphicsPipelineObject::GetDefaultConfiguration(pipelineConfig);
 
-        pipelineConfig.RenderPass = _swapChain->getRenderPass();
+        pipelineConfig.RenderPass = _swapChain->GetGraphicsRenderPass();
         pipelineConfig.PipelineLayout = _pipelineLayout;
 
-        _pipline = std::make_unique<PipelineObject>(_device, pipelineConfig, "PrecompiledShaders\\Flat.vert.spv", "PrecompiledShaders\\Flat.frag.spv");
+        //_pipline = std::make_unique<GraphicsPipelineObject>(_device, pipelineConfig, "PrecompiledShaders\\Flat.vert.spv", "PrecompiledShaders\\Flat.frag.spv");
+        _pipline = std::make_unique<GraphicsPipelineObject>(_device, pipelineConfig, "PrecompiledShaders\\OnScreen.vert.spv", "PrecompiledShaders\\OnScreen.frag.spv");
     }
     
     void Tracer::CreateCommandBuffers()
     {
-        _commandBuffers.resize(_swapChain->imageCount());
+        _commandBuffers.resize(_swapChain->GetImageCount());
 
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -132,7 +155,7 @@ namespace TraceCore
     void Tracer::DrawFrame()
     {
         uint32_t imageIndex;
-        auto result = _swapChain->acquireNextImage(&imageIndex);
+        auto result = _swapChain->AcquireNextImage(&imageIndex);
 
         if(result == VK_ERROR_OUT_OF_DATE_KHR) {
             RecreateSwapChain();
@@ -144,7 +167,7 @@ namespace TraceCore
         }
 
         RecordCommandBuffer(imageIndex);
-        result = _swapChain->submitCommandBuffers(&_commandBuffers[imageIndex], &imageIndex);
+        result = _swapChain->SubmitCommandBuffers(&_commandBuffers[imageIndex], &imageIndex);
 
         if(result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || _mainWindow.FramebufferResized()) {
             _mainWindow.ResetFramebufferResizedFlag();
@@ -160,7 +183,8 @@ namespace TraceCore
     void Tracer::RecreateSwapChain()
     {
         auto extent = _mainWindow.GetExtent();
-        while(extent.width == 0 || extent.height == 0) {
+        while(extent.width == 0 || extent.height == 0) 
+        {
             extent = _mainWindow.GetExtent();
             glfwWaitEvents();
         }
@@ -170,24 +194,29 @@ namespace TraceCore
         if(_swapChain == nullptr)
         {
             _swapChain = std::make_unique<SwapChain>(_device, extent);
-        } else {
+        } 
+        else 
+        {
             _swapChain = std::make_unique<SwapChain>(_device, extent, std::move(_swapChain));
 
-            if(_swapChain->imageCount() != _commandBuffers.size()) {
+            if(_swapChain->GetImageCount() != _commandBuffers.size()) 
+            {
                 FreeCommandBuffers();
                 CreateCommandBuffers();
             }
+
+            CreatePipeline();
         }
-        
-        CreatePipeline();
     }
 
     void Tracer::RecordCommandBuffer(int index)
     {
-        static int frame = 0;
-        frame = (frame + 1) % 1000;
+        vkResetCommandBuffer(_commandBuffers[index], 0);
+
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = 0; // Optional
+        beginInfo.pInheritanceInfo = nullptr; // Optional
 
         if(vkBeginCommandBuffer(_commandBuffers[index], &beginInfo) != VK_SUCCESS) {
             throw std::runtime_error("failed to begin recording command buffer!");
@@ -195,11 +224,11 @@ namespace TraceCore
 
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = _swapChain->getRenderPass();
-        renderPassInfo.framebuffer = _swapChain->getFrameBuffer(index);
+        renderPassInfo.renderPass = _swapChain->GetGraphicsRenderPass();
+        renderPassInfo.framebuffer = _swapChain->GetFrameBuffer(index);
 
         renderPassInfo.renderArea.offset = {0, 0};
-        renderPassInfo.renderArea.extent = _swapChain->getSwapChainExtent();
+        renderPassInfo.renderArea.extent = _swapChain->GetExtent();
 
         std::array<VkClearValue, 2> clearValues{};
         clearValues[0].color = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -213,25 +242,27 @@ namespace TraceCore
         VkViewport viewport{};
         viewport.x = 0.0f;
         viewport.y = 0.0f;
-        viewport.width = static_cast<float>(_swapChain->width());
-        viewport.height = static_cast<float>(_swapChain->height());
+        viewport.width = static_cast<float>(_swapChain->GetWidth());
+        viewport.height = static_cast<float>(_swapChain->GetHeight());
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
-        VkRect2D scissor{{0, 0}, _swapChain->getSwapChainExtent()};
+        VkRect2D scissor{{0, 0}, _swapChain->GetExtent()};
         vkCmdSetViewport(_commandBuffers[index], 0, 1, &viewport);
         vkCmdSetScissor(_commandBuffers[index], 0, 1, &scissor);
         
         _pipline->Bind(_commandBuffers[index]);
-        _model->Bind(_commandBuffers[index]);
-
-        for (int i = 0; i < 4; i++)
-        {
-            SimplePushConstantData push{};
-            push.offset = {0.0f, -0.4f + i * 0.25f};
-            push.color = {0.0f, 0.0f, 0.2f + i * 0.2f};
-            vkCmdPushConstants(_commandBuffers[index], _pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SimplePushConstantData), &push);
-            _model->Draw(_commandBuffers[index]);
-        }
+        _shaderResourceManager->BindDescriptorSet(_commandBuffers[index], _pipelineLayout, index);
+        //_model->Bind(_commandBuffers[index]);
+        vkCmdDraw(_commandBuffers[index], 6, 1, 0, 0);
+        
+        // for (int i = 0; i < 4; i++)
+        // {
+        //     SimplePushConstantData push{};
+        //     push.offset = {0.0f, -0.4f + i * 0.25f};
+        //     push.color = {0.0f, 0.0f, 0.2f + i * 0.2f};
+        //     vkCmdPushConstants(_commandBuffers[index], _pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SimplePushConstantData), &push);
+        //     //_model->Draw(_commandBuffers[index]);
+        // }
 
         vkCmdEndRenderPass(_commandBuffers[index]);
 

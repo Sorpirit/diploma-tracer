@@ -8,7 +8,7 @@
 
 #include <vector>
 
-namespace TraceCore {
+namespace TracerCore {
 
     struct Vertex {
         public:

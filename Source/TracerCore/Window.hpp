@@ -5,7 +5,7 @@
 
 #include <string>
 
-namespace TraceCore
+namespace TracerCore
 {
 
     class Window

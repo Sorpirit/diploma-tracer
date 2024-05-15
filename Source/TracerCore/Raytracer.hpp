@@ -5,7 +5,7 @@
 
 #include "VulkanDevice.hpp"
 
-namespace TraceCore
+namespace TracerCore
 {
     class Raytracer
     {
@@ -15,4 +15,4 @@ namespace TraceCore
     private:
         VkPhysicalDeviceRayTracingPipelinePropertiesKHR _rtProperties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
     };
-} // namespace TraceCore
+} // namespace TracerCore

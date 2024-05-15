@@ -2,7 +2,7 @@
 
 #include <stdexcept>
 
-namespace TraceCore
+namespace TracerCore
 {
 
     Window::Window(int width, int height, std::string windowName) :

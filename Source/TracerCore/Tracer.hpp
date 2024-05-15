@@ -6,12 +6,14 @@
 
 #include "Window.hpp"
 #include "VulkanDevice.hpp"
-#include "PiplineObject.hpp"
+#include "GraphicsPipelineObject.hpp"
 #include "SwapChain.hpp"
 #include "Model.hpp"
+#include "Texture2D.hpp"
 #include "Raytracer.hpp"
+#include "ShaderReosuceManager.hpp"
 
-namespace TraceCore
+namespace TracerCore
 {
     class Tracer
     {
@@ -28,6 +30,7 @@ namespace TraceCore
         void Run();
     private:
         void LoadModels();
+        void LoadImages();
         void CreatePipelineLayout();
         void CreatePipeline();
         void DrawFrame();
@@ -36,16 +39,20 @@ namespace TraceCore
         void RecordCommandBuffer(int index);
         void FreeCommandBuffers();
 
-        Window _mainWindow{WIDTH, HEIGHT, "Hello Vulkan"};
+        Window _mainWindow{WIDTH, HEIGHT, "Sorpirit Raytracer"};
         VulkanDevice _device{_mainWindow};
 
         std::unique_ptr<SwapChain> _swapChain;
-        std::unique_ptr<PipelineObject> _pipline;
+        std::unique_ptr<GraphicsPipelineObject> _pipline;
+        std::unique_ptr<GraphicsPipelineObject> _onScreenPipline;
         VkPipelineLayout _pipelineLayout;
         std::vector<VkCommandBuffer> _commandBuffers;
         Raytracer _raytracer;
 
         std::unique_ptr<Model> _model;
+        std::unique_ptr<Texture2D> _texture2d;
+        std::unique_ptr<Texture2D> _computeTexture;
+        std::unique_ptr<ShaderReosuceManager> _shaderResourceManager;
     };
     
 }

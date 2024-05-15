@@ -1,7 +1,7 @@
 
-project('Tracer', ['c', 'cpp'],
+project('Tracer', ['cpp'],
   version: '0.0.1',
-  default_options: ['cpp_std=c++17' ]
+  default_options: ['cpp_std=c++17']
 )
 
 subdir('Source')
@@ -22,7 +22,7 @@ glfw_include = include_directories(glfw_lib_dir + '\\include')
 glm_include = include_directories('Libraries\\glm-1.0.1')
 
 trace_core = executable('Tracer', tracer_core_src,
-  include_directories: [glfw_include, vulkan_include, glm_include],
+  include_directories: [glfw_include, vulkan_include, glm_include, stb_include],
   dependencies: [glfw_lib, vulkan_lib, tracer_utils_dep],
   install: true,
 )

@@ -1,9 +1,9 @@
 #include "Raytracer.hpp"
 
-namespace TraceCore
+namespace TracerCore
 {
     void Raytracer::LoadRaytracer(VulkanDevice& device)
     {
         device.initRayTracing(&_rtProperties);
     }
-} // namespace TraceCore
+} // namespace TracerCore

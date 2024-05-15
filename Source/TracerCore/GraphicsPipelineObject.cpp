@@ -1,31 +1,29 @@
-#include "PiplineObject.hpp"
+#include "GraphicsPipelineObject.hpp"
 #include "TracerIO.hpp"
 #include "Model.hpp"
 
 #include <iostream>
 #include <assert.h>
 
-namespace TraceCore
+namespace TracerCore
 {
-    PipelineObject::PipelineObject(VulkanDevice& device, const PipelineConfiguration& config, const std::string& vertexShaderPath, const std::string& fragmentShaderPath) :
+    GraphicsPipelineObject::GraphicsPipelineObject(VulkanDevice& device, const PipelineConfiguration& config, const std::string& vertexShaderPath, const std::string& fragmentShaderPath) :
         _device(device)
     {
         CreateGraphicsPipeline(config, vertexShaderPath, fragmentShaderPath);
     }
 
-    PipelineObject::~PipelineObject()
+    GraphicsPipelineObject::~GraphicsPipelineObject()
     {
-        vkDestroyShaderModule(_device.GetVkDevice(), _vertexShaderModule, nullptr);
-        vkDestroyShaderModule(_device.GetVkDevice(), _fragmentShaderModule, nullptr);
         vkDestroyPipeline(_device.GetVkDevice(), _graphicsPipline, nullptr);
     }
 
-    void PipelineObject::Bind(VkCommandBuffer commandBuffer)
+    void GraphicsPipelineObject::Bind(VkCommandBuffer commandBuffer)
     {
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipline);
     }
 
-    void PipelineObject::GetDefaultConfiguration(PipelineConfiguration& config)
+    void GraphicsPipelineObject::GetDefaultConfiguration(PipelineConfiguration& config)
     {
         config.InputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
         config.InputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -34,8 +32,8 @@ namespace TraceCore
         config.ViewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
         config.ViewportInfo.viewportCount = 1;
         config.ViewportInfo.scissorCount = 1;
-        config.ViewportInfo.pScissors = nullptr;
-        config.ViewportInfo.pViewports = nullptr;
+        config.ViewportInfo.pScissors = nullptr; // dynamicly set
+        config.ViewportInfo.pViewports = nullptr; // dynamicly set
         
         config.Rasterization.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
         config.Rasterization.depthClampEnable = VK_FALSE;
@@ -94,10 +92,9 @@ namespace TraceCore
         config.DynamicState.dynamicStateCount = static_cast<uint32_t>(config.DynamicStateEnables.size());
         config.DynamicState.pDynamicStates = config.DynamicStateEnables.data();
         config.DynamicState.flags = 0;
-
     }
 
-    void PipelineObject::CreateGraphicsPipeline(const PipelineConfiguration &config, const std::string &vertexShaderPath, const std::string &fragmentShaderPath)
+    void GraphicsPipelineObject::CreateGraphicsPipeline(const PipelineConfiguration &config, const std::string &vertexShaderPath, const std::string &fragmentShaderPath)
     {
         assert(config.PipelineLayout != VK_NULL_HANDLE && 
             "Cannot create graphics pipeline! No pipeline layout provided in PipelineConfiguration");
@@ -108,34 +105,26 @@ namespace TraceCore
         auto vertexShaderCode = TracerUtils::IOHelpers::ReadFile(vertexShaderPath);
         auto fragmentShaderCode = TracerUtils::IOHelpers::ReadFile(fragmentShaderPath);
 
-        CreateShaderModule(*(vertexShaderCode.get()), &_vertexShaderModule);
-        CreateShaderModule(*(fragmentShaderCode.get()), &_fragmentShaderModule);
+        VkShaderModule vertexShaderModule;
+        VkShaderModule fragmentShaderModule;
 
-        VkPipelineShaderStageCreateInfo shaderStages[2];
-        shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-        shaderStages[0].module = _vertexShaderModule;
-        shaderStages[0].pName = "main";
-        shaderStages[0].flags = 0;
-        shaderStages[0].pNext = nullptr;
-        shaderStages[0].pSpecializationInfo = nullptr;
+        VkPipelineShaderStageCreateInfo shaderStages[] = { {}, {} };
 
-        shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        shaderStages[1].module = _fragmentShaderModule;
-        shaderStages[1].pName = "main";
-        shaderStages[1].flags = 0;
-        shaderStages[1].pNext = nullptr;
-        shaderStages[1].pSpecializationInfo = nullptr;
+        CreatePipleineStage(vertexShaderCode.get(), VK_SHADER_STAGE_VERTEX_BIT, &vertexShaderModule, shaderStages[0]);
+        CreatePipleineStage(fragmentShaderCode.get(), VK_SHADER_STAGE_FRAGMENT_BIT, &fragmentShaderModule, shaderStages[1]);
 
-        auto bindingDescription = Vertex::GetBindingDescription();
-        auto attributeDescriptions = Vertex::GetAttributeDescriptions();
+        //auto bindingDescription = Vertex::GetBindingDescription();
+        //auto attributeDescriptions = Vertex::GetAttributeDescriptions();
         VkPipelineVertexInputStateCreateInfo vertexInput{};
         vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertexInput.vertexAttributeDescriptionCount = attributeDescriptions.size();
-        vertexInput.vertexBindingDescriptionCount = bindingDescription.size();
-        vertexInput.pVertexAttributeDescriptions = attributeDescriptions.data();
-        vertexInput.pVertexBindingDescriptions = bindingDescription.data();
+        // vertexInput.vertexAttributeDescriptionCount = attributeDescriptions.size();
+        // vertexInput.vertexBindingDescriptionCount = bindingDescription.size();
+        // vertexInput.pVertexAttributeDescriptions = attributeDescriptions.data();
+        // vertexInput.pVertexBindingDescriptions = bindingDescription.data();
+        vertexInput.vertexAttributeDescriptionCount = 0;
+        vertexInput.vertexBindingDescriptionCount = 0;
+        vertexInput.pVertexAttributeDescriptions = nullptr;
+        vertexInput.pVertexBindingDescriptions = nullptr;
 
         VkGraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -160,18 +149,33 @@ namespace TraceCore
         if(vkCreateGraphicsPipelines(_device.GetVkDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_graphicsPipline) != VK_SUCCESS){
             throw std::runtime_error("failed to create graphics pipeline");
         }
+
+        vkDestroyShaderModule(_device.GetVkDevice(), vertexShaderModule, nullptr);
+        vkDestroyShaderModule(_device.GetVkDevice(), fragmentShaderModule, nullptr);
     }
 
-    void PipelineObject::CreateShaderModule(const std::vector<char> &code, VkShaderModule *shaderModule)
+    void GraphicsPipelineObject::CreateShaderModule(const std::vector<char>* code, VkShaderModule *shaderModule)
     {
         VkShaderModuleCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        createInfo.codeSize = code.size();
-        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+        createInfo.codeSize = code->size();
+        createInfo.pCode = reinterpret_cast<const uint32_t*>(code->data());
 
         if(vkCreateShaderModule(_device.GetVkDevice(), &createInfo, nullptr, shaderModule) != VK_SUCCESS) 
         {
             throw std::runtime_error("failed to create shader module");
         }
+    }
+    void GraphicsPipelineObject::CreatePipleineStage(const std::vector<char>* code, const VkShaderStageFlagBits stage, VkShaderModule *shaderModule, VkPipelineShaderStageCreateInfo &shaderStage)
+    {
+        CreateShaderModule(code, shaderModule);
+
+        shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        shaderStage.stage = stage;
+        shaderStage.module = *shaderModule;
+        shaderStage.pName = "main";
+        shaderStage.flags = 0;
+        shaderStage.pNext = nullptr;
+        shaderStage.pSpecializationInfo = nullptr;
     }
 }

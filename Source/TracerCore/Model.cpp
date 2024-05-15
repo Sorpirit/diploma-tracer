@@ -2,7 +2,7 @@
 
 #include <cassert>
 
-namespace TraceCore
+namespace TracerCore
 {
     std::vector<VkVertexInputBindingDescription> Vertex::GetBindingDescription() {
         std::vector<VkVertexInputBindingDescription> attributeDescriptions{};
