@@ -1,29 +1,14 @@
-#include "GraphicsPipelineObject.hpp"
+
+#include "PipelineManager.hpp"
+
 #include "TracerIO.hpp"
-#include "Model.hpp"
 
 #include <iostream>
 #include <assert.h>
 
 namespace TracerCore
 {
-    GraphicsPipelineObject::GraphicsPipelineObject(VulkanDevice& device, const PipelineConfiguration& config, const std::string& vertexShaderPath, const std::string& fragmentShaderPath) :
-        _device(device)
-    {
-        CreateGraphicsPipeline(config, vertexShaderPath, fragmentShaderPath);
-    }
-
-    GraphicsPipelineObject::~GraphicsPipelineObject()
-    {
-        vkDestroyPipeline(_device.GetVkDevice(), _graphicsPipline, nullptr);
-    }
-
-    void GraphicsPipelineObject::Bind(VkCommandBuffer commandBuffer)
-    {
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipline);
-    }
-
-    void GraphicsPipelineObject::GetDefaultConfiguration(PipelineConfiguration& config)
+    void PipelineManager::GetDefaultConfiguration(PipelineConfiguration& config)
     {
         config.InputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
         config.InputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -94,7 +79,31 @@ namespace TracerCore
         config.DynamicState.flags = 0;
     }
 
-    void GraphicsPipelineObject::CreateGraphicsPipeline(const PipelineConfiguration &config, const std::string &vertexShaderPath, const std::string &fragmentShaderPath)
+    PipelineManager::PipelineManager(VulkanDevice &device) :
+        _device(device)
+    {
+    }
+
+    PipelineManager::~PipelineManager()
+    {
+    }
+
+    void PipelineManager::CreatePipelineLayout(const VkDescriptorSetLayout& setLayout, VkPipelineLayout *pipelineLayout)
+    {
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = 1; // Optional
+        pipelineLayoutInfo.pSetLayouts = &setLayout; // Optional
+        pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
+        pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
+        if(vkCreatePipelineLayout(_device.GetVkDevice(), &pipelineLayoutInfo, nullptr, pipelineLayout) != VK_SUCCESS) 
+        {
+            throw std::runtime_error("failed to create pipeline layout!");
+        }
+    }
+
+    void PipelineManager::CreateGraphicsPipeline(const PipelineConfiguration &config, const std::string &vertexShaderPath, const std::string &fragmentShaderPath, VkPipeline *pipeline)
     {
         assert(config.PipelineLayout != VK_NULL_HANDLE && 
             "Cannot create graphics pipeline! No pipeline layout provided in PipelineConfiguration");
@@ -146,7 +155,7 @@ namespace TracerCore
         pipelineInfo.basePipelineIndex = -1;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-        if(vkCreateGraphicsPipelines(_device.GetVkDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_graphicsPipline) != VK_SUCCESS){
+        if(vkCreateGraphicsPipelines(_device.GetVkDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, pipeline) != VK_SUCCESS){
             throw std::runtime_error("failed to create graphics pipeline");
         }
 
@@ -154,7 +163,33 @@ namespace TracerCore
         vkDestroyShaderModule(_device.GetVkDevice(), fragmentShaderModule, nullptr);
     }
 
-    void GraphicsPipelineObject::CreateShaderModule(const std::vector<char>* code, VkShaderModule *shaderModule)
+    void PipelineManager::CreateComputePipeline(const VkPipelineLayout layout, const std::string &computeShaderPath, VkPipeline* pipeline)
+    {
+        assert(layout != VK_NULL_HANDLE && 
+            "Cannot create graphics pipeline! No pipeline layout provided in PipelineConfiguration");
+
+        auto computeShaderCode = TracerUtils::IOHelpers::ReadFile(computeShaderPath);
+        VkShaderModule computeShaderModule;
+        VkPipelineShaderStageCreateInfo computeShaderStage;
+
+        CreatePipleineStage(computeShaderCode.get(), VK_SHADER_STAGE_COMPUTE_BIT, &computeShaderModule, computeShaderStage);
+
+        VkComputePipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+        pipelineInfo.stage = computeShaderStage;
+        pipelineInfo.layout = layout;
+        
+        pipelineInfo.basePipelineIndex = -1;
+        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+        
+        if(vkCreateComputePipelines(_device.GetVkDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, pipeline) != VK_SUCCESS){
+            throw std::runtime_error("failed to create graphics pipeline");
+        }
+
+        vkDestroyShaderModule(_device.GetVkDevice(), computeShaderModule, nullptr);
+    }
+
+    void PipelineManager::CreateShaderModule(const std::vector<char>* code, VkShaderModule *shaderModule)
     {
         VkShaderModuleCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -166,7 +201,8 @@ namespace TracerCore
             throw std::runtime_error("failed to create shader module");
         }
     }
-    void GraphicsPipelineObject::CreatePipleineStage(const std::vector<char>* code, const VkShaderStageFlagBits stage, VkShaderModule *shaderModule, VkPipelineShaderStageCreateInfo &shaderStage)
+
+    void PipelineManager::CreatePipleineStage(const std::vector<char>* code, const VkShaderStageFlagBits stage, VkShaderModule *shaderModule, VkPipelineShaderStageCreateInfo &shaderStage)
     {
         CreateShaderModule(code, shaderModule);
 

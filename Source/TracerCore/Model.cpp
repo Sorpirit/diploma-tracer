@@ -64,12 +64,12 @@ namespace TracerCore
 
         // VkBuffer stagingBuffer;
         // VkDeviceMemory stagingBufferMemory;
-        _device.CreateBuffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, _vertexBuffer, _vertexBufferMemory);
+        // _device.CreateBuffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, _vertexBuffer, _vertexBufferMemory);
 
-        void* data;
-        vkMapMemory(_device.GetVkDevice(), _vertexBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, vertices.data(), static_cast<size_t>(bufferSize));
-        vkUnmapMemory(_device.GetVkDevice(), _vertexBufferMemory);
+        // void* data;
+        // vkMapMemory(_device.GetVkDevice(), _vertexBufferMemory, 0, bufferSize, 0, &data);
+        // memcpy(data, vertices.data(), static_cast<size_t>(bufferSize));
+        // vkUnmapMemory(_device.GetVkDevice(), _vertexBufferMemory);
 
         // _device.CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _vertexBuffer, _vertexBufferMemory);
         // _device.CopyBuffer(stagingBuffer, _vertexBuffer, bufferSize);

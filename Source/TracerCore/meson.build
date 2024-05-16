@@ -1,3 +1,16 @@
-tracer_core_src = files(['main.cpp', 'VulkanDevice.cpp', 'Window.cpp', 'SwapChain.cpp', 'Tracer.cpp', 'GraphicsPipelineObject.cpp', 'Model.cpp', 'Raytracer.cpp', 'ShaderReosuceManager.cpp', 'Texture2D.cpp', 'ComputePipelineObject.cpp', 'Utils/DebugLayerMessenger.cpp'])
+tracer_core_src = files([
+    'main.cpp', 
+    'VulkanDevice.cpp', 
+    'Window.cpp', 
+    'SwapChain.cpp', 
+    'Tracer.cpp', 
+    'PipelineObject.cpp', 
+    'Model.cpp', 
+    'Raytracer.cpp', 
+    'ShaderReosuceManager.cpp', 
+    'PipelineManager.cpp',
+    'Resources/Texture2D.cpp', 
+    'Resources/VulkanBuffer.cpp', 
+    'Utils/DebugLayerMessenger.cpp'])
 
 

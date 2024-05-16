@@ -27,34 +27,30 @@ namespace TracerCore
         uint32_t Subpass = 0;
     };
 
-    /// @brief Represents standart graphics pipeline object. Sequence of operations that tells the GPU how to render a given scene.
-    class GraphicsPipelineObject
+    class PipelineManager
     {
     public:
-        GraphicsPipelineObject(VulkanDevice& device, const PipelineConfiguration& config, const std::string& vertexShaderPath, const std::string& fragmentShaderPath);
-        GraphicsPipelineObject(VulkanDevice& device, const PipelineConfiguration& config, const std::string& shaderName);
-        ~GraphicsPipelineObject();
+        PipelineManager(VulkanDevice& device);
+        ~PipelineManager();
 
-        GraphicsPipelineObject(const GraphicsPipelineObject&) = delete;
-        GraphicsPipelineObject operator=(const GraphicsPipelineObject&) = delete;
-        
-        void Bind(VkCommandBuffer commandBuffer);
+        PipelineManager(const PipelineManager&) = delete;
+        PipelineManager operator=(const PipelineManager&) = delete;
 
         static void GetDefaultConfiguration(PipelineConfiguration& config);
 
+        void CreatePipelineLayout(const VkDescriptorSetLayout& setLayout, VkPipelineLayout* pipelineLayout);
+
+        void CreateGraphicsPipeline(const PipelineConfiguration& config, const std::string& vertexShaderPath, const std::string& fragmentShaderPath, VkPipeline* pipeline);
+        void CreateComputePipeline(const VkPipelineLayout config, const std::string& computeShaderPath, VkPipeline* pipeline);
+
     private:
-        void CreateGraphicsPipeline(const PipelineConfiguration& config, const std::string& vertexShaderPath, const std::string& fragmentShaderPath);
-        void CreateComputePipeline(const PipelineConfiguration& config, const std::string& computeShaderPath);
-        
-        /// @brief Creates a shader module from the given code.
+        VulkanDevice& _device;
+
         void CreateShaderModule(const std::vector<char>* code, VkShaderModule* shaderModule);
         void CreatePipleineStage(
             const std::vector<char>* code, 
             const VkShaderStageFlagBits stage, 
             VkShaderModule* shaderModule, 
             VkPipelineShaderStageCreateInfo& shaderStage);
-
-        VulkanDevice& _device;
-        VkPipeline _graphicsPipline;        
     };
 }

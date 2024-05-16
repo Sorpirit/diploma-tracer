@@ -9,8 +9,6 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
-#include "GraphicsPipelineObject.hpp"
-
 
 namespace TracerCore
 {
@@ -26,17 +24,15 @@ namespace TracerCore
         RecreateSwapChain();
         LoadModels();
         LoadImages();
-        _shaderResourceManager = std::make_unique<ShaderReosuceManager>(_device, _swapChain->GetImageCount());
-        _shaderResourceManager->UploadTexture(_texture2d.get());
-        CreatePipelineLayout();
-        CreatePipeline();
+        CreateOnScreenPipelines();
+        CreateComputePipelines();
+
         CreateCommandBuffers();
         _raytracer.LoadRaytracer(_device);
     }
 
     Tracer::~Tracer()
     {
-        vkDestroyPipelineLayout(_device.GetVkDevice(), _pipelineLayout, nullptr);
     }
 
     void Tracer::Run()
@@ -66,77 +62,113 @@ namespace TracerCore
 
     void Tracer::LoadImages()
     {
-        _texture2d = Texture2D::LoadFileTexture("Textures\\cutecat.jpg", _device);
+        _texture2d = Resources::Texture2D::LoadFileTexture("Textures\\cutecat.jpg", _device);
 
         const uint32_t texWidth = 512;
         const uint32_t texHeight = 512;
 
-        _computeTexture = Texture2D::CreateRuntimeTexture(texWidth, texHeight, 
+        _computeTexture = Resources::Texture2D::CreateTexture2D(texWidth, texHeight, 
             VK_FORMAT_R8G8B8A8_UNORM, 
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT  | VK_IMAGE_USAGE_SAMPLED_BIT,
+            false,
             _device
         );
-
-        VkDeviceSize imageSize = texWidth * texHeight * 4;
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        _device.CreateBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-        uint32_t imageData[texWidth * texHeight];
-
-        for (auto i = 0; i < texWidth; i++)
-        {
-            for (auto j = 0; j < texHeight; j++)
-            {
-                auto x = i / static_cast<float>(texWidth);
-                auto y = j / static_cast<float>(texHeight);
-                imageData[i + j * 500] = 0xff000000 | static_cast<uint32_t>(x * 255.0f) << 8 | static_cast<uint32_t>(y * 255.0f);
-            }
-        }
-
-        void* data;
-        vkMapMemory(_device.GetVkDevice(), stagingBufferMemory, 0, imageSize, 0, &data);
-            memcpy(data, imageData, static_cast<size_t>(imageSize));
-        vkUnmapMemory(_device.GetVkDevice(), stagingBufferMemory);
-
-        Texture2D::TransitionImageLayout(_computeTexture->GetImage(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _device);
-        Texture2D::CopyBufferToImage(stagingBuffer, _computeTexture->GetImage(), texWidth, texHeight, _device);
-        Texture2D::TransitionImageLayout(_computeTexture->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, _device);
-    
-        vkDestroyBuffer(_device.GetVkDevice(), stagingBuffer, nullptr);
-        vkFreeMemory(_device.GetVkDevice(), stagingBufferMemory, nullptr);
     }
 
-    void Tracer::CreatePipelineLayout()
-    {
-        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-
-        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = 1; // Optional
-        pipelineLayoutInfo.pSetLayouts = _shaderResourceManager->GetDescriptorSetLayout(); // Optional
-        pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
-        pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
-        if(vkCreatePipelineLayout(_device.GetVkDevice(), &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create pipeline layout!");
-        }
-
-    }
-    
-    void Tracer::CreatePipeline()
+    void Tracer::CreateOnScreenPipelines()
     {
         assert(_swapChain != nullptr && "Unable to create pipeline while swap chain is not created");
-        assert(_pipelineLayout != nullptr && "Unable to create pipeline while pipeline layout is not created");
+
+        //Create graphics pipeline;
+        auto imageCount = _swapChain->GetImageCount();
+
+        VkDescriptorPool descriptorPool;
+        VkDescriptorSetLayout setLayout;
+        std::vector<VkDescriptorSet> descriptorSets;
+        VkPipelineLayout pipelineLayout;
+        VkPipeline onScreenPipeline;
+
+        VkDescriptorPoolSize poolSizes[] = {
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageCount}
+        };
+        VkDescriptorSetLayoutBinding layoutBindings[1];
+        layoutBindings[0].binding = 0;
+        layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        layoutBindings[0].descriptorCount = 1;
+        layoutBindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        layoutBindings[0].pImmutableSamplers = nullptr;
+
+        _shaderResourceManager.CreateDescriptorPool(poolSizes, 1, imageCount, descriptorPool);
+        _shaderResourceManager.CreateDescriptorSetLayout(layoutBindings, 1, setLayout);
+        _shaderResourceManager.CreateDescriptorSets(descriptorPool, setLayout, imageCount, descriptorSets);
+
+        _pipelineManager.CreatePipelineLayout(setLayout, &pipelineLayout);
 
         PipelineConfiguration pipelineConfig{};
-        GraphicsPipelineObject::GetDefaultConfiguration(pipelineConfig);
-
+        PipelineManager::GetDefaultConfiguration(pipelineConfig);
         pipelineConfig.RenderPass = _swapChain->GetGraphicsRenderPass();
-        pipelineConfig.PipelineLayout = _pipelineLayout;
+        pipelineConfig.PipelineLayout = pipelineLayout;
 
-        //_pipline = std::make_unique<GraphicsPipelineObject>(_device, pipelineConfig, "PrecompiledShaders\\Flat.vert.spv", "PrecompiledShaders\\Flat.frag.spv");
-        _pipline = std::make_unique<GraphicsPipelineObject>(_device, pipelineConfig, "PrecompiledShaders\\OnScreen.vert.spv", "PrecompiledShaders\\OnScreen.frag.spv");
+        _pipelineManager.CreateGraphicsPipeline(pipelineConfig,  "PrecompiledShaders\\OnScreen.vert.spv", "PrecompiledShaders\\OnScreen.frag.spv", &onScreenPipeline);
+
+        _shaderResourceManager.UploadTexture(descriptorSets, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, _computeTexture.get());
+
+        _graphicsPipeline = std::make_unique<PipelineObject>(
+            _device,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            setLayout,
+            descriptorPool, 
+            std::move(descriptorSets),
+            pipelineLayout,
+            onScreenPipeline
+        );
     }
+
+    void Tracer::CreateComputePipelines()
+    {
+        assert(_swapChain != nullptr && "Unable to create pipeline while swap chain is not created");
+
+        //Create compute pipeline
+        auto imageCount = _swapChain->GetImageCount();
+
+        VkDescriptorPool descriptorPool;
+        VkDescriptorSetLayout setLayout;
+        std::vector<VkDescriptorSet> descriptorSets;
+        VkPipelineLayout pipelineLayout;
+        VkPipeline computePipeline;
+
+        VkDescriptorPoolSize poolSizes[] = {
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageCount}
+        };
+        VkDescriptorSetLayoutBinding layoutBindings[1];
+        layoutBindings[0].binding = 0;
+        layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        layoutBindings[0].descriptorCount = 1;
+        layoutBindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        layoutBindings[0].pImmutableSamplers = nullptr;
+
+        _shaderResourceManager.CreateDescriptorPool(poolSizes, 1, imageCount, descriptorPool);
+        _shaderResourceManager.CreateDescriptorSetLayout(layoutBindings, 1, setLayout);
+        _shaderResourceManager.CreateDescriptorSets(descriptorPool, setLayout, imageCount, descriptorSets);
+
+        _pipelineManager.CreatePipelineLayout(setLayout, &pipelineLayout);
+
+        _pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\Raytracing.comp.spv", &computePipeline);
+
+        _shaderResourceManager.UploadTexture(descriptorSets, 0, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, _computeTexture.get());
     
+        _computePipeline = std::make_unique<PipelineObject>(
+            _device,
+            VK_PIPELINE_BIND_POINT_COMPUTE,
+            setLayout,
+            descriptorPool, 
+            std::move(descriptorSets),
+            pipelineLayout,
+            computePipeline
+        );
+    }
+
     void Tracer::CreateCommandBuffers()
     {
         _commandBuffers.resize(_swapChain->GetImageCount());
@@ -166,6 +198,17 @@ namespace TracerCore
             throw std::runtime_error("failed to acquire swap chain image!");
         }
 
+        
+
+        //Run compute pipeline
+        _computeTexture->TransitionImageLayout(VK_IMAGE_LAYOUT_GENERAL);
+        auto cmdBuffer = _device.BeginSingleTimeCommands();
+        _computePipeline->Bind(cmdBuffer, imageIndex);
+        vkCmdDispatch(cmdBuffer, _computeTexture->GetWidth() / 8, _computeTexture->GetHeight() / 8, 1);
+        _device.EndSingleTimeCommands(cmdBuffer);
+        _computeTexture->TransitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        vkResetCommandBuffer(_commandBuffers[imageIndex], 0);
         RecordCommandBuffer(imageIndex);
         result = _swapChain->SubmitCommandBuffers(&_commandBuffers[imageIndex], &imageIndex);
 
@@ -205,14 +248,12 @@ namespace TracerCore
                 CreateCommandBuffers();
             }
 
-            CreatePipeline();
+            CreateOnScreenPipelines();
         }
     }
 
     void Tracer::RecordCommandBuffer(int index)
     {
-        vkResetCommandBuffer(_commandBuffers[index], 0);
-
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = 0; // Optional
@@ -250,19 +291,9 @@ namespace TracerCore
         vkCmdSetViewport(_commandBuffers[index], 0, 1, &viewport);
         vkCmdSetScissor(_commandBuffers[index], 0, 1, &scissor);
         
-        _pipline->Bind(_commandBuffers[index]);
-        _shaderResourceManager->BindDescriptorSet(_commandBuffers[index], _pipelineLayout, index);
+        _graphicsPipeline->Bind(_commandBuffers[index], index);
         //_model->Bind(_commandBuffers[index]);
         vkCmdDraw(_commandBuffers[index], 6, 1, 0, 0);
-        
-        // for (int i = 0; i < 4; i++)
-        // {
-        //     SimplePushConstantData push{};
-        //     push.offset = {0.0f, -0.4f + i * 0.25f};
-        //     push.color = {0.0f, 0.0f, 0.2f + i * 0.2f};
-        //     vkCmdPushConstants(_commandBuffers[index], _pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SimplePushConstantData), &push);
-        //     //_model->Draw(_commandBuffers[index]);
-        // }
 
         vkCmdEndRenderPass(_commandBuffers[index]);
 
