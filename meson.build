@@ -4,7 +4,10 @@ project('Tracer', ['cpp'],
   default_options: ['cpp_std=c++17']
 )
 
-subdir('Source')
+if get_option('tracy_enable')
+  add_project_arguments('-DTRACY_ENABLE', language : 'cpp')
+endif
+
 #Libraries
 vulkan_lib_dir = 'C:\\VulkanSDK\\1.3.280.0'
 glfw_lib_dir = 'Libraries\\glfw-3.4.bin.WIN64'
@@ -21,9 +24,12 @@ vulkan_include = include_directories(vulkan_lib_dir + '\\Include')
 glfw_include = include_directories(glfw_lib_dir + '\\include')
 glm_include = include_directories('Libraries\\glm-1.0.1')
 
+subdir('Source')
+subdir('Libraries')
+
 trace_core = executable('Tracer', tracer_core_src,
-  include_directories: [glfw_include, vulkan_include, glm_include, stb_include],
-  dependencies: [glfw_lib, vulkan_lib, tracer_utils_dep],
+  include_directories: [glfw_include, vulkan_include, glm_include, stb_include, imgui_include, imgui_backend_include, tracy_public_include_dirs],
+  dependencies: [glfw_lib, vulkan_lib, tracer_utils_dep, tracy_dep, imgui_dep],
   install: true,
 )
 

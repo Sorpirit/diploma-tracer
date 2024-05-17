@@ -9,6 +9,7 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
+#include <tracy/Tracy.hpp>
 
 namespace TracerCore
 {
@@ -21,6 +22,7 @@ namespace TracerCore
 
     Tracer::Tracer()
     {
+        ZoneScoped;
         RecreateSwapChain();
         LoadModels();
         LoadImages();
@@ -44,6 +46,7 @@ namespace TracerCore
         while(_mainWindow.ShouldClose()) {
             glfwPollEvents();
             DrawFrame();
+            FrameMark;
         }
 
         vkDeviceWaitIdle(_device.GetVkDevice());
@@ -198,8 +201,6 @@ namespace TracerCore
             throw std::runtime_error("failed to acquire swap chain image!");
         }
 
-        
-
         //Run compute pipeline
         _computeTexture->TransitionImageLayout(VK_IMAGE_LAYOUT_GENERAL);
         auto cmdBuffer = _device.BeginSingleTimeCommands();
@@ -249,7 +250,12 @@ namespace TracerCore
             }
 
             CreateOnScreenPipelines();
+            CreateComputePipelines();
         }
+
+        _uiLayer = nullptr;
+        _uiLayer = std::make_unique<UI::ImguiLayer>(_device);
+        _uiLayer->Init(&_mainWindow, _swapChain.get());
     }
 
     void Tracer::RecordCommandBuffer(int index)
@@ -294,6 +300,8 @@ namespace TracerCore
         _graphicsPipeline->Bind(_commandBuffers[index], index);
         //_model->Bind(_commandBuffers[index]);
         vkCmdDraw(_commandBuffers[index], 6, 1, 0, 0);
+
+        _uiLayer->Render(_commandBuffers[index]);
 
         vkCmdEndRenderPass(_commandBuffers[index]);
 

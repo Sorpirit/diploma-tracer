@@ -26,7 +26,7 @@
 		{
 			"label": "Setup",
 			"type": "shell",
-			"command": "meson setup --backend vs Build",
+			"command": "meson setup -D tracy_enable=true --backend vs Build",
 			"problemMatcher": [
 				"$meson-gcc"
 			],
@@ -40,7 +40,7 @@
 		{
 			"label": "Wipe Setup",
 			"type": "shell",
-			"command": "meson setup --wipe --backend vs Build",
+			"command": "meson setup --wipe -D tracy_enable=true --backend vs Build",
 			"problemMatcher": [
 				"$meson-gcc"
 			],

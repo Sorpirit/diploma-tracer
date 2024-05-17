@@ -45,8 +45,14 @@ namespace TracerCore {
         VulkanDevice(VulkanDevice &&) = delete;
         VulkanDevice &operator=(VulkanDevice &&) = delete;
 
+        /// @brief Getter for Vulkan instance.
+        inline VkInstance GetVkInstance() { return _instance; }
+
         /// @brief Getter for Vulkan logical device.
         inline VkDevice GetVkDevice() { return _device; }
+
+        /// @brief Getter for Vulkan physical device.
+        inline VkPhysicalDevice GetPhysicalDevice() { return _physicalDevice; }
 
         /// @brief Returns window surface for rendering.
         inline VkSurfaceKHR GetSurface() { return _surface; }

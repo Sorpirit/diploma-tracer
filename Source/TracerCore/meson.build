@@ -11,6 +11,9 @@ tracer_core_src = files([
     'PipelineManager.cpp',
     'Resources/Texture2D.cpp', 
     'Resources/VulkanBuffer.cpp', 
-    'Utils/DebugLayerMessenger.cpp'])
+    'Utils/DebugLayerMessenger.cpp',
+    'UI/ImguiLayer.cpp',
+    'UI/UILayer.cpp',
+])
 
 

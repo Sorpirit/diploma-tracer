@@ -7,6 +7,8 @@
 #include "Window.hpp"
 #include "VulkanDevice.hpp"
 #include "SwapChain.hpp"
+#include "UI/ImguiLayer.hpp"
+#include "UI/UILayer.hpp"
 #include "Model.hpp"
 #include "Resources/Texture2D.hpp"
 #include "Raytracer.hpp"
@@ -50,6 +52,8 @@ namespace TracerCore
 
         std::unique_ptr<SwapChain> _swapChain;
         std::vector<VkCommandBuffer> _commandBuffers;
+
+        std::unique_ptr<UI::UILayer> _uiLayer;
 
         std::unique_ptr<Model> _model;
 

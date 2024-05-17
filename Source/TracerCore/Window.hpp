@@ -21,6 +21,8 @@ namespace TracerCore
         inline VkExtent2D GetExtent() { return {static_cast<uint32_t>(_width), static_cast<uint32_t>(_height)}; };
         inline bool FramebufferResized() { return _framebufferResized; };
         inline void ResetFramebufferResizedFlag() { _framebufferResized = false; };
+
+        inline GLFWwindow* GetWindow() { return _window; };
         
         void CreateWindowSurface(VkInstance instance, VkSurfaceKHR* surface);
     private:
