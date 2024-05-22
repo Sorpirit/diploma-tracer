@@ -11,14 +11,39 @@
 
 #include <tracy/Tracy.hpp>
 
+#include "UI/CamerUIControl.hpp"
+
+#include "Models/TracerVertex.hpp"
+
+
 namespace TracerCore
 {
-    struct SimplePushConstantData
+    std::vector<TracerUtils::Models::TrianglePolygon> Cube()
     {
-        glm::mat2 transform{1.0f};
-        glm::vec2 offset;
-        alignas(16) glm::vec3 color;
-    };
+        std::vector<TracerUtils::Models::TrianglePolygon> triangles(12);
+        auto v0 = glm::vec3(1.0f, -1.0f, -1.0f);
+        auto v1 = glm::vec3(1.0f, -1.0f, 1.0f);
+        auto v2 = glm::vec3(-1.0f, -1.0f, 1.0f);
+        auto v3 = glm::vec3(-1.0f, -1.0f, -1.0f);
+        auto v4 = glm::vec3(1.0f, 1.0f, -1.0f);
+        auto v5 = glm::vec3(1.0f, 1.0f, 1.0f);
+        auto v6 = glm::vec3(-1.0f, 1.0f, 1.0f);
+        auto v7 = glm::vec3(-1.0f, 1.0f, -1.0f);
+        triangles[0] = {v1, v2, v3};
+        triangles[1] = {v7, v6, v5};
+        triangles[2] = {v0, v4, v5};
+        triangles[3] = {v1, v5, v6};
+        triangles[4] = {v6, v7, v3};
+        triangles[5] = {v0, v3, v7};
+        triangles[6] = {v0, v1, v3};
+        triangles[7] = {v4, v7, v5};
+        triangles[8] = {v1, v0, v5};
+        triangles[9] = {v2, v1, v6};
+        triangles[10] = {v2, v6, v3};
+        triangles[11] = {v4, v0, v7};
+        return triangles;
+    }
+    
 
     Tracer::Tracer()
     {
@@ -26,6 +51,21 @@ namespace TracerCore
         RecreateSwapChain();
         LoadModels();
         LoadImages();
+
+        auto extent = _mainWindow.GetExtent();
+        _camera.SetParameters(glm::vec3(0, 0, 0), glm::vec3(0, 0, -1));
+        _camera.SetProjection(glm::radians(95.0f), extent.width / (float) extent.height, 0.1f, 150.0f);
+
+        _frameData.Color = glm::vec3(0.5, 0.7, 1.0);
+        _frameData.FrameIndex = 1;
+        _frameData.Projection = _camera.GetProjection();
+        _frameData.InvProjection = _camera.GetInvProjection();
+        _frameData.View = _camera.GetView();
+        _frameData.InvView = _camera.GetInvView();
+
+        _frameStats.color = _frameData.Color;
+
+        CreateBuffers();
         CreateOnScreenPipelines();
         CreateComputePipelines();
 
@@ -35,6 +75,8 @@ namespace TracerCore
 
     Tracer::~Tracer()
     {
+        _framedataBuffer->UnmapMemory();
+        _uiLayer = nullptr;
     }
 
     void Tracer::Run()
@@ -42,10 +84,59 @@ namespace TracerCore
         uint32_t extensionCount = 0;
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
         std::cout << extensionCount << " extensions supported\n";
+        uint32_t frameCount = 1;
+
+        uint32_t lastFPSReadFrameId = 0;
+        uint32_t lastFPSRead = 0;
+        uint32_t frameTimeSum = 0;
+
+        float deltaTime = 0.0f;
+        float lastFrame = 0.0f;
+        float currentFrame = 0.0f;
+
+        uint32_t accumStartFrameIndex = 0;
 
         while(_mainWindow.ShouldClose()) {
+            currentFrame = glfwGetTime();
+            deltaTime = currentFrame - lastFrame;
+            lastFrame = currentFrame;
+            frameTimeSum += (uint32_t) (deltaTime * 1000.0f);
+            if(frameTimeSum >= 3000.0)
+            {
+                frameTimeSum = 0.0f;
+                lastFPSRead = (frameCount - lastFPSReadFrameId) / 3;
+                lastFPSReadFrameId = frameCount;
+                _frameStats.FPS = lastFPSRead;
+            }
+
+            _frameStats.FrameTime = deltaTime;
+
             glfwPollEvents();
+
+            //update frame params
+            _frameData.Color = glm::vec3(1, 0, 0.0f);
+            _frameData.Projection = _camera.GetProjection();
+            _frameData.InvProjection = _camera.GetInvProjection();
+            _frameData.View = _camera.GetView();
+            _frameData.InvView = _camera.GetInvView();
+            _frameData.FrameIndex = frameCount;
+            
+            if(_frameData.UseAccumTexture != _camera.IsStatic())
+            {
+                accumStartFrameIndex = frameCount;
+            }
+
+            _frameData.UseAccumTexture = _camera.IsStatic();
+            _frameData.AccumFrameIndex = frameCount - accumStartFrameIndex;
+
+            _frameData.Color = _frameStats.color;
+
+            VkDeviceSize size = sizeof(FrameData);
+            memcpy(_frameDataPtr, &_frameData, size);
+            
+
             DrawFrame();
+            frameCount++;
             FrameMark;
         }
 
@@ -54,29 +145,74 @@ namespace TracerCore
 
     void Tracer::LoadModels()
     {
-        std::vector<Vertex> vertices = {
-            {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-            {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-            {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
-        };
+        auto triangles = Cube();
+        size_t triangleBufferSize = sizeof(TracerUtils::Models::TrianglePolygon) * triangles.size();
+        _triangleBuffer = Resources::VulkanBuffer::CreateBuffer(_device, triangleBufferSize, 
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_HEAP_DEVICE_LOCAL_BIT);
+        
+        void* data;
+        _triangleBuffer->MapMemory(triangleBufferSize, 0, &data);
+        memcpy(data, triangles.data(), triangleBufferSize);
+        _triangleBuffer->UnmapMemory();
 
-        _model = std::make_unique<Model>(_device, vertices);
+        //auto model = TracerUtils::IOHelpers::LoadModel("Models\\blneder_suzanne.fbx");
+        
+        //auto model = TracerUtils::IOHelpers::LoadModel("Models\\sphere.fbx");
+        //auto model = TracerUtils::IOHelpers::LoadModel("Models\\Chicken_01.obj");
+        
+        //auto model = TracerUtils::IOHelpers::LoadModel("Models\\Goat_01.obj");
+        //auto model = TracerUtils::IOHelpers::LoadModel("Models\\Cow.fbx");
+
+        //auto model = TracerUtils::IOHelpers::LoadModel("Models\\cube.fbx");
+        auto model = TracerUtils::IOHelpers::LoadModel("Models\\Chicken_02.obj");
+
+        auto modelPolygon = model.GetTriangles();
+        auto modelBufferSize = sizeof(TracerUtils::Models::TrianglePolygon) * modelPolygon->size();
+        _frameStats.TriCount = modelPolygon->size();
+        
+        _modelBuffer = Resources::VulkanBuffer::CreateBuffer(_device, modelBufferSize, 
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_HEAP_DEVICE_LOCAL_BIT);
+        
+        _modelBuffer->MapMemory(modelBufferSize, 0, &data);
+        memcpy(data, modelPolygon->data(), modelBufferSize);
+        _modelBuffer->UnmapMemory();
+        delete modelPolygon;
     }
 
     void Tracer::LoadImages()
     {
         _texture2d = Resources::Texture2D::LoadFileTexture("Textures\\cutecat.jpg", _device);
 
-        const uint32_t texWidth = 512;
-        const uint32_t texHeight = 512;
-
-        _computeTexture = Resources::Texture2D::CreateTexture2D(texWidth, texHeight, 
+        auto extent = _mainWindow.GetExtent();
+        _computeTexture = Resources::Texture2D::CreateTexture2D(extent.width, extent.height, 
             VK_FORMAT_R8G8B8A8_UNORM, 
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT  | VK_IMAGE_USAGE_SAMPLED_BIT,
             false,
             _device
         );
+
+        _accumulationTexture = Resources::Texture2D::CreateTexture2D(extent.width, extent.height, 
+            VK_FORMAT_R32G32B32A32_SFLOAT, 
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT  | VK_IMAGE_USAGE_SAMPLED_BIT,
+            false,
+            _device
+        );
+        _accumulationTexture->TransitionImageLayout(VK_IMAGE_LAYOUT_GENERAL);
+    }
+
+    void Tracer::CreateBuffers()
+    {
+        VkDeviceSize size = sizeof(FrameData);
+        _framedataBuffer = Resources::VulkanBuffer::CreateBuffer(_device, size, 
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        
+        _framedataBuffer->MapMemory(size, 0, &_frameDataPtr);
+        memcpy(_frameDataPtr, &_frameData, size);
     }
 
     void Tracer::CreateOnScreenPipelines()
@@ -142,17 +278,36 @@ namespace TracerCore
         VkPipeline computePipeline;
 
         VkDescriptorPoolSize poolSizes[] = {
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageCount}
+            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, imageCount * 2},
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, imageCount},
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, imageCount},
         };
-        VkDescriptorSetLayoutBinding layoutBindings[1];
+
+        const int bindingCount = 4;
+        VkDescriptorSetLayoutBinding layoutBindings[bindingCount];
         layoutBindings[0].binding = 0;
         layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         layoutBindings[0].descriptorCount = 1;
         layoutBindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
         layoutBindings[0].pImmutableSamplers = nullptr;
+        layoutBindings[1].binding = 1;
+        layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        layoutBindings[1].descriptorCount = 1;
+        layoutBindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        layoutBindings[1].pImmutableSamplers = nullptr;
+        layoutBindings[2].binding = 2;
+        layoutBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        layoutBindings[2].descriptorCount = 1;
+        layoutBindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        layoutBindings[2].pImmutableSamplers = nullptr;
+        layoutBindings[3].binding = 3;
+        layoutBindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        layoutBindings[3].descriptorCount = 1;
+        layoutBindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        layoutBindings[3].pImmutableSamplers = nullptr;
 
         _shaderResourceManager.CreateDescriptorPool(poolSizes, 1, imageCount, descriptorPool);
-        _shaderResourceManager.CreateDescriptorSetLayout(layoutBindings, 1, setLayout);
+        _shaderResourceManager.CreateDescriptorSetLayout(layoutBindings, bindingCount, setLayout);
         _shaderResourceManager.CreateDescriptorSets(descriptorPool, setLayout, imageCount, descriptorSets);
 
         _pipelineManager.CreatePipelineLayout(setLayout, &pipelineLayout);
@@ -160,7 +315,10 @@ namespace TracerCore
         _pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\Raytracing.comp.spv", &computePipeline);
 
         _shaderResourceManager.UploadTexture(descriptorSets, 0, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, _computeTexture.get());
-    
+        _shaderResourceManager.UploadBuffer(descriptorSets, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, _framedataBuffer.get());
+        _shaderResourceManager.UploadTexture(descriptorSets, 2, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, _accumulationTexture.get());
+        _shaderResourceManager.UploadBuffer(descriptorSets, 3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, _modelBuffer.get());
+
         _computePipeline = std::make_unique<PipelineObject>(
             _device,
             VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -205,7 +363,7 @@ namespace TracerCore
         _computeTexture->TransitionImageLayout(VK_IMAGE_LAYOUT_GENERAL);
         auto cmdBuffer = _device.BeginSingleTimeCommands();
         _computePipeline->Bind(cmdBuffer, imageIndex);
-        vkCmdDispatch(cmdBuffer, _computeTexture->GetWidth() / 8, _computeTexture->GetHeight() / 8, 1);
+        vkCmdDispatch(cmdBuffer, glm::ceil( _computeTexture->GetWidth() / 32.0f), glm::ceil(_computeTexture->GetHeight() / 32.0f), 1);
         _device.EndSingleTimeCommands(cmdBuffer);
         _computeTexture->TransitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
@@ -256,6 +414,8 @@ namespace TracerCore
         _uiLayer = nullptr;
         _uiLayer = std::make_unique<UI::ImguiLayer>(_device);
         _uiLayer->Init(&_mainWindow, _swapChain.get());
+        _uiLayer->AddLayer(std::make_unique<UI::CamerUIControl>(_camera, _mainWindow));
+        _uiLayer->AddLayer(std::make_unique<UI::StatisticsWindow>(_frameStats));
     }
 
     void Tracer::RecordCommandBuffer(int index)

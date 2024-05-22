@@ -22,6 +22,21 @@ namespace TracerCore
         inline bool FramebufferResized() { return _framebufferResized; };
         inline void ResetFramebufferResizedFlag() { _framebufferResized = false; };
 
+        inline void LockCursor() {
+            if(_isCursorLocked)
+                return;
+
+            _isCursorLocked = true;
+            glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);  
+        };
+        inline void UnlockCursor() {
+            if(!_isCursorLocked)
+                return;
+
+            _isCursorLocked = false;
+            glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        };
+
         inline GLFWwindow* GetWindow() { return _window; };
         
         void CreateWindowSurface(VkInstance instance, VkSurfaceKHR* surface);
@@ -32,6 +47,8 @@ namespace TracerCore
         int _width;
         int _height;
         bool _framebufferResized = false;
+
+        bool _isCursorLocked;
 
         std::string _windowName;
         GLFWwindow* _window;

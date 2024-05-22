@@ -55,21 +55,22 @@ namespace TracerCore
         }
     }
 
-    void ShaderReosuceManager::UploadBuffer(std::vector<VkDescriptorSet>& descriptorSets, int dtsBinding, VkDescriptorType descriptorType, VkBuffer buffer, VkDeviceSize stride)
+    void ShaderReosuceManager::UploadBuffer(std::vector<VkDescriptorSet>& descriptorSets, int dtsBinding, VkDescriptorType descriptorType, 
+            const Resources::VulkanBuffer* buffer)
     {
         for (size_t i = 0; i < descriptorSets.size(); i++) 
         {
             VkDescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = buffer;
+            bufferInfo.buffer = buffer->GetBuffer();
             bufferInfo.offset = 0;
-            bufferInfo.range = stride;
+            bufferInfo.range = buffer->GetSize();
 
             VkWriteDescriptorSet descriptorWrite{};
             descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             descriptorWrite.dstSet = descriptorSets[i];
             descriptorWrite.dstBinding = dtsBinding;
             descriptorWrite.dstArrayElement = 0;
-            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrite.descriptorType = descriptorType;
             descriptorWrite.descriptorCount = 1;
             descriptorWrite.pBufferInfo = &bufferInfo;
             descriptorWrite.pImageInfo = nullptr; // Optional
@@ -79,12 +80,12 @@ namespace TracerCore
         }
     }
 
-    void ShaderReosuceManager::UploadTexture(std::vector<VkDescriptorSet>& descriptorSets, int dtsBinding, VkImageLayout layout, VkDescriptorType descriptorType, const Resources::Texture2D* texture)
+    void ShaderReosuceManager::UploadTexture(std::vector<VkDescriptorSet>& descriptorSets, int dtsBinding, VkImageLayout targetLayout, VkDescriptorType descriptorType, const Resources::Texture2D* texture)
     {
         for (size_t i = 0; i < descriptorSets.size(); i++) 
         {
             VkDescriptorImageInfo imageInfo{};
-            imageInfo.imageLayout = layout;
+            imageInfo.imageLayout = targetLayout;
             imageInfo.imageView = texture->GetImageView();
             imageInfo.sampler = texture->GetSampler();
 

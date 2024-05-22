@@ -20,7 +20,12 @@ precompiled_folder = os.path.join(os.path.dirname(__file__), "PrecompiledShaders
 # Check each shader file in the Shaders folder
 for shader_file in os.listdir(shaders_folder):
     shader_path = os.path.join(shaders_folder, shader_file)
+    shader_ext = os.path.splitext(shader_file)
     precompiled_shader_path = os.path.join(precompiled_folder, shader_file + compiled_shader_postfix)
+
+    #skip include shaders
+    if shader_ext == '.glsl':
+        continue
 
     # Check if the shader file exists in PrecompiledShaders folder
     if os.path.exists(precompiled_shader_path):

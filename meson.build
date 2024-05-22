@@ -28,8 +28,8 @@ subdir('Source')
 subdir('Libraries')
 
 trace_core = executable('Tracer', tracer_core_src,
-  include_directories: [glfw_include, vulkan_include, glm_include, stb_include, imgui_include, imgui_backend_include, tracy_public_include_dirs],
-  dependencies: [glfw_lib, vulkan_lib, tracer_utils_dep, tracy_dep, imgui_dep],
+  include_directories: [glfw_include, vulkan_include, glm_include, stb_include, imgui_include, imgui_backend_include, tracy_public_include_dirs, assimp_include],
+  dependencies: [glfw_lib, vulkan_lib, tracer_utils_dep, tracy_dep, imgui_dep, assimp_lib],
   install: true,
 )
 

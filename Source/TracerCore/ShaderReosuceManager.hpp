@@ -8,6 +8,7 @@
 
 #include "VulkanDevice.hpp"
 #include "Resources/Texture2D.hpp"
+#include "Resources/VulkanBuffer.hpp"
 
 namespace TracerCore
 {
@@ -28,12 +29,11 @@ namespace TracerCore
             std::vector<VkDescriptorSet>& descriptorSets, 
             int dtsBinding, 
             VkDescriptorType descriptorType, 
-            VkBuffer buffer, 
-            VkDeviceSize stride);
+            const Resources::VulkanBuffer* buffer);
         void UploadTexture(
             std::vector<VkDescriptorSet>& descriptorSets, 
             int dtsBinding, 
-            VkImageLayout layout, 
+            VkImageLayout targetLayout,
             VkDescriptorType descriptorType, 
             const Resources::Texture2D* texture);
             

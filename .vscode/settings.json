@@ -75,6 +75,21 @@
         "functional": "cpp",
         "random": "cpp",
         "span": "cpp",
-        "*.rh": "cpp"
+        "*.rh": "cpp",
+        "condition_variable": "cpp",
+        "deque": "cpp",
+        "mutex": "cpp",
+        "queue": "cpp",
+        "ranges": "cpp",
+        "shared_mutex": "cpp",
+        "stop_token": "cpp",
+        "thread": "cpp",
+        "any": "cpp",
+        "bitset": "cpp",
+        "cinttypes": "cpp",
+        "numeric": "cpp",
+        "regex": "cpp",
+        "stack": "cpp",
+        "variant": "cpp"
     }
 }

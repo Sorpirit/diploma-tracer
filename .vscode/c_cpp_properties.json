@@ -10,7 +10,8 @@
                 "${workspaceFolder}\\Libraries\\stb\\**",
                 "${workspaceFolder}/Libraries/imgui",
                 "${workspaceFolder}/Libraries/imgui/backends",
-                "${workspaceFolder}\\Libraries\\Tracy\\public\\**"
+                "${workspaceFolder}\\Libraries\\Tracy\\public\\**",
+                "${workspaceFolder}/Libraries/assimp/include"
             ],
             "defines": [
                 "_DEBUG",

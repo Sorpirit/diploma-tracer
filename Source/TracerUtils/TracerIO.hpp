@@ -6,6 +6,14 @@
 #include <filesystem>
 #include <stb_image.h>
 
+#include "Models/TracerMesh.hpp"
+#include "Models/TracerVertex.hpp"
+
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+#include <assimp/mesh.h>
+
 namespace TracerUtils
 {
     class IOHelpers
@@ -15,11 +23,14 @@ namespace TracerUtils
         
         static stbi_uc* LoadImage(const std::string& filePath, int* width, int* height, int* channels, bool useAlphaChannel);
         static void FreeImage(stbi_uc* image);
+        static Models::TracerMesh LoadModel(const std::string& filePath);
 
         static inline void SetAssetFolder(const std::string& assetFolderPath) { _assetFolder = assetFolderPath; };
 
     private:
         static inline std::filesystem::path _assetFolder;
+
+        static void VisitNode(const aiNode* node, const aiScene* scene, std::vector<const aiMesh*>* meshes);
+        static void ImportMesh(const aiMesh* mesh, Models::TracerMesh& tracerMesh);
     };
 }
-

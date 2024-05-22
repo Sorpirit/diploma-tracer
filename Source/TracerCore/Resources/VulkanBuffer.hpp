@@ -21,6 +21,7 @@ namespace Resources
         void CopyBuffer(VkBuffer srcBuffer, VkDeviceSize size);
 
         inline VkBuffer GetBuffer() const { return _buffer; }
+        inline VkDeviceSize GetSize() const { return _size; }
 
         void CopyToImage(Texture2D* image);
         void CopyToBuffer(VulkanBuffer* dstBuffer);

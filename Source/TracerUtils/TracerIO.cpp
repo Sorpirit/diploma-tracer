@@ -6,6 +6,8 @@
 
 namespace TracerUtils
 {
+
+
     std::unique_ptr<std::vector<char>> IOHelpers::ReadFile(const std::string& filePath)
     {
         //ate - seek to the end of the ile
@@ -43,5 +45,58 @@ namespace TracerUtils
     void IOHelpers::FreeImage(stbi_uc *image)
     {
         stbi_image_free(image);
+    }
+
+    Models::TracerMesh IOHelpers::LoadModel(const std::string &filePath)
+    {
+        Models::TracerMesh mesh;
+        Assimp::Importer importer;
+
+        auto strPath = (_assetFolder / std::filesystem::path(filePath)).string();
+        const aiScene* scene = importer.ReadFile(strPath, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
+
+        std::vector<const aiMesh*> meshes;
+        VisitNode(scene->mRootNode, scene, &meshes);
+        ImportMesh(meshes[0], mesh);
+
+        importer.FreeScene();
+        return mesh;
+    }
+
+    void IOHelpers::VisitNode(const aiNode *node, const aiScene *scene, std::vector<const aiMesh *> *meshes)
+    {
+        for (size_t i = 0; i < node->mNumMeshes; i++)
+        {
+            auto mesh = scene->mMeshes[node->mMeshes[i]];
+            meshes->push_back(mesh);
+        }
+
+        for (size_t i = 0; i < node->mNumChildren; i++)
+        {
+            VisitNode(node->mChildren[i], scene, meshes);
+        }
+    }
+
+    void IOHelpers::ImportMesh(const aiMesh* mesh, Models::TracerMesh& tracerMesh)
+    {
+        for (size_t i = 0; i < mesh->mNumVertices; i++)
+        {
+            Models::TracerVertex vertex;
+            vertex.Position = glm::vec3(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
+            vertex.Normal = glm::vec3(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
+            //TODO fix texture import
+            //vertex.TextureCoordinate = glm::vec2(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y); 
+
+            tracerMesh.Vertices.push_back(vertex);
+        }
+
+        for (size_t i = 0; i < mesh->mNumFaces; i++)
+        {
+            auto face = mesh->mFaces[i];
+            for (size_t j = 0; j < face.mNumIndices; j++)
+            {
+                tracerMesh.Indices.push_back(face.mIndices[j]);
+            }
+        }
     }
 }

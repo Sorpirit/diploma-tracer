@@ -12,6 +12,20 @@ namespace UI
     ImguiLayer::ImguiLayer(VulkanDevice& device)
         : UILayer(device), _showDemoWindow(true)
     {
+   
+    }
+
+    ImguiLayer::~ImguiLayer()
+    {
+        ImGui_ImplVulkan_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        vkDestroyDescriptorPool(_device.GetVkDevice(), _descriptorPool, nullptr);
+
+        ImGui::DestroyContext();
+    }
+
+    void ImguiLayer::Init(Window* window, SwapChain* swapchain)
+    {
         // Setup Dear ImGui context
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -34,21 +48,10 @@ namespace UI
             style.WindowRounding = 0.0f;
             style.Colors[ImGuiCol_WindowBg].w = 1.0f;
         }
-    }
 
-    ImguiLayer::~ImguiLayer()
-    {
-        ImGui_ImplVulkan_Shutdown();
-        ImGui_ImplGlfw_Shutdown();
-
-        vkDestroyDescriptorPool(_device.GetVkDevice(), _descriptorPool, nullptr);
-        //TODO:
-        //ImGui::DestroyContext();
-    }
-
-    void ImguiLayer::Init(Window* window, SwapChain* swapchain)
-    {
         auto queueFamilyIndices = _device.FindPhysicalQueueFamilies();
+
+        _isInitilized = true;
 
         VkDescriptorPoolSize pool_sizes[] =
         {
@@ -90,10 +93,11 @@ namespace UI
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        //ImGui::ShowDemoWindow(&_showDemoWindow);
         //UI pass
-        //ImGui::ShowExampleAppDockSpace(&_showDemoWindow);
-        ImGui::ShowDemoWindow(&_showDemoWindow);
-        //ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+        for(auto& layer : _layers){
+            layer->Render();
+        }
 
         // Rendering
         ImGui::Render();

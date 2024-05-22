@@ -22,6 +22,7 @@ namespace UI
 
     private:
         bool _showDemoWindow = true;
+        bool _isInitilized = false;
 
         VkDescriptorPool _descriptorPool;
     };

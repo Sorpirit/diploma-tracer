@@ -14,6 +14,9 @@ tracer_core_src = files([
     'Utils/DebugLayerMessenger.cpp',
     'UI/ImguiLayer.cpp',
     'UI/UILayer.cpp',
+    'UI/CamerUIControl.cpp',
+    'UI/StatisicUILayer.cpp',
+    'TracerCamera.cpp'
 ])
 
 

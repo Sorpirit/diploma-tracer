@@ -37,6 +37,7 @@ namespace Resources
         inline VkImageView GetImageView() const { return _imageView; }
         inline VkSampler GetSampler() const { return _sampler; }
         inline VkDeviceMemory GetImageMemory() const { return _memory; }
+        inline VkImageLayout GetImageLayout() const { return _currentLayout; }
 
         inline uint32_t GetWidth() { return _width; }
         inline uint32_t GetHeight() { return _height; }

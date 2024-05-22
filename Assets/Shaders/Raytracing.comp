@@ -1,60 +1,249 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "./include/random.glsl"
+#include "./include/constants.glsl"
+#include "./include/color.glsl"
 
 layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
 layout(binding = 0, rgba8) uniform writeonly image2D resultImage;
+
+layout(binding = 1, std140) uniform SceneData{
+    mat4 camProjection;
+    mat4 camView;
+    mat4 camInvProjection;
+    mat4 camInvView;
+    vec3 color;
+    uint frameIndex;
+    uint useAccumulationTexture;
+    uint accumFrameIndex;
+} sceneData;
+
+layout(binding = 2, rgba32f) uniform image2D accumulationTexture;
+
+struct triangle {
+    vec3 v0;
+    vec3 v1;
+    vec3 v2;
+    vec3 n0;
+    vec3 n1;
+    vec3 n2;
+    bool precalculatedNormals;
+    uint materialFlag;
+};
+
+layout(binding = 3, std140) readonly buffer Triangles{
+    triangle triangles[];
+};
 
 struct ray {
     vec3 origin;
     vec3 direction;
 };
 
+struct HitResult {
+    vec3 hitPoint;
+    vec3 normal;
+    float hitDistance;
+    uint materialFlag;
+};
+
 struct sphere {
     vec3 center;
     float radius;
+    uint materialFlag;
 };
 
-bool hitSphere(sphere sphere, ray ray, inout vec3 normal){
+
+
+bool hitSphere(sphere sphere, ray ray, inout HitResult hitResult){
     //solve sphere equation
-    vec3 origin = ray.origin - sphere.center;
+    vec3 origin = sphere.center - ray.origin;
     
     float a = dot(ray.direction, ray.direction);
-    float b = 2 * dot(origin, ray.direction);
+    float h = dot(origin, ray.direction);
     float c = dot(origin, origin) - sphere.radius * sphere.radius;
 
-    float discriminant = b * b - 4 * a * c;
+    float discriminant = h * h - a * c;
     if(discriminant < 0) return false;
     
+    float sqrtDiscriminant = sqrt(discriminant);
+
     //calculate hitpoint and normal
-    float t = (-b - sqrt(discriminant) / (2 * a));
-    vec3 hitPoint = ray.origin + t * ray.direction;
-    normal = normalize(-hitPoint - sphere.center);
+    float t0 = (h - sqrtDiscriminant / a);
+    if(t0 < 0.001 || t0 > 1000) 
+    {
+        t0 = (h + sqrtDiscriminant / a);
+        if(t0 < 0.001 || t0 > 1000) return false;
+    }
+
+
+    vec3 hitPoint = ray.origin + t0 * ray.direction;
+    vec3 normal = normalize(hitPoint - sphere.center);
+
+    hitResult.hitDistance = t0;
+    hitResult.hitPoint = hitPoint;
+    hitResult.normal = normal;// dot(normal, ray.direction) >= 0 ? -normal : normal;
+    hitResult.materialFlag = sphere.materialFlag;
+
     return true;
 }
 
-vec3 PerPixel(vec2 coord) {
-    ray ray = ray(vec3(0,0,1), vec3(coord, -1));
-    sphere sphere = sphere(vec3(0,0,0), 0.5);
-
-    //if sphere is hit return its normal
-    vec3 normal;    
-    if (hitSphere(sphere, ray, normal)) {
-        return normal;
-    }
+bool hitTriangle(triangle tri, ray ray, inout HitResult hitResult) {
+    vec3 v0v1 = tri.v1 - tri.v0;
+    vec3 v0v2 = tri.v2 - tri.v0;
+    vec3 pVec = cross(ray.direction, v0v2);
+    float det = dot(v0v1, pVec);
     
-    //return black
-    return vec3(0);
+    if(abs(det) < epsilon) 
+    {
+        return false;
+    } 
+    
+    float invDet = 1 / det;
+    vec3 tVec = ray.origin - tri.v0;
+    float u = dot(tVec, pVec) * invDet;
+    vec3 qVec = cross(tVec, v0v1);
+    float v = dot(ray.direction, qVec) * invDet;
+    
+    if(u < 0.0 || v < 0.0 || (u + v) > 1.0) return false;
+
+    float t = dot(v0v2, qVec) * invDet;
+    if (t <= 0.001) return false;
+    
+    hitResult.hitDistance = t;
+    hitResult.hitPoint = ray.origin + t * ray.direction;
+    hitResult.normal = vec3(u,v,1-u-v);
+    if (!tri.precalculatedNormals)
+        hitResult.normal = normalize(cross(v0v2, v0v1));
+    else
+        hitResult.normal = tri.n1 * u + tri.n2 * v + tri.n0 * (1 - u - v);
+    
+    if(det < 0) 
+        hitResult.normal *= -1;
+
+    hitResult.materialFlag = tri.materialFlag;
+    
+    return true;
 }
 
-void main() {
+vec3 GetRayDirection(vec2 screenCord)
+{
+    vec4 target = sceneData.camInvProjection * vec4(screenCord, 1.0, 1.0);
+    vec3 dir = vec3(sceneData.camInvView * vec4(normalize(vec3(target.xyz / target.w)), 0.0));
+    return normalize(dir);
+}
+
+vec3 TraceRay(ray ray)
+{
+    sphere spheres[3];
+
+    spheres[0] = sphere(vec3(1.8, 0.0, -0.1), 0.5, 2);
+    spheres[1] = sphere(vec3(-1.8, 0.0, -0.1), 0.5, 3);
+    spheres[2] = sphere(vec3(0,-100.5, -1), 100, 0);
+
+    vec4 atenuationFuzz[4];
+    
+    atenuationFuzz[0] = vec4(0.8, 0.8, 0.0, 0.0);
+    atenuationFuzz[1] = vec4(0.8, 0.6, 0.2, 0.01);
+    atenuationFuzz[2] = vec4(0.1, 0.2, 0.5, 0.4);
+    atenuationFuzz[3] = vec4(0.8, 0.8, 0.8, 1.0);
+    
+    uint maxBounces = 4;
+    vec3 finalColor = vec3(0);
+    vec3 color = vec3(1);
+        
+    for(int d = 0; d < maxBounces; d++) 
+    {
+        HitResult currentHit;
+        HitResult closestHit;
+        bool hit = false;
+        float closestT = infinity;
+        for(int i = 0; i < spheres.length(); i++)
+        {
+            if (hitSphere(spheres[i], ray, currentHit))
+            {
+                hit = true;
+                if (currentHit.hitDistance < closestT)
+                {
+                    closestT = currentHit.hitDistance;
+                    closestHit = currentHit;
+                }
+            }
+        }
+
+        for(int i = 0; i < triangles.length(); i++)
+        {
+            if (hitTriangle(triangles[i], ray, currentHit))
+            {
+                hit = true;
+                if (currentHit.hitDistance < closestT)
+                {
+                    closestT = currentHit.hitDistance;
+                    closestHit = currentHit;
+                }
+            }
+        }
+
+        if (hit) {
+            color *= atenuationFuzz[closestHit.materialFlag].xyz;
+            ray.origin = closestHit.hitPoint + closestHit.normal * 0.01;
+            ray.direction = closestHit.materialFlag == 0 ? closestHit.normal + randomUnitVector() : 
+                normalize(reflect(ray.direction, closestHit.normal)) + atenuationFuzz[closestHit.materialFlag].w * randomUnitVector();
+        }
+        else {
+            vec3 unitDir = normalize(ray.direction);
+            float a = 0.5 * (unitDir.y + 1.0);
+            vec3 skyColor =  (1.0 - a * vec3(1) + a * sceneData.color);
+            finalColor = color * skyColor;
+            break;
+        }        
+    }
+    return finalColor;
+}
+
+
+void main() 
+{
     vec2 imageSize = vec2(imageSize(resultImage));
+    ivec2 textureCoord = ivec2(gl_GlobalInvocationID.xy);
     
     //calculate uv coords
-    vec2 uv = (gl_GlobalInvocationID.xy) / imageSize.xy;
-    uv = uv * 2 - 1; //map -1 -> 1
-    uv = vec2(uv.x, uv.y);
+    vec2 uv = textureCoord / imageSize.xy;
+    vec2 screenCord = uv * 2 - 1;
+    screenCord.y *= -1;
     
-    vec3 color = PerPixel(uv);    
+    // modify random seed
+    gState *= floatBitsToUint(uv.y * uv.x / 1000) * textureCoord.x * sceneData.frameIndex;
+
+    vec3 origin = sceneData.camInvView[3].xyz;
+
+    //anti aliasing
+    uint samplesPerPixel = 4;
+    float influence = 0.0025;
+    vec3 frameColor = vec3(0);    
+    for(int i = 0; i < samplesPerPixel; i++) {
+        vec3 dir = GetRayDirection(screenCord) + influence * hash3();
+        ray ray = ray(origin, dir);
+        frameColor += TraceRay(ray);
+    }
+    frameColor /= samplesPerPixel;
+
+    vec3 color = frameColor.rgb;
+    int useAcc = int(sceneData.useAccumulationTexture);
+    int firstAcc = int(sceneData.accumFrameIndex != 0);
+
+    vec3 currentColor = frameColor + useAcc * imageLoad(accumulationTexture, ivec2(gl_GlobalInvocationID.xy)).rgb;
+
+    if(firstAcc == 1)
+    {
+        imageStore(accumulationTexture, ivec2(gl_GlobalInvocationID.xy), vec4(currentColor, 1));
+    }
+        
+    color = currentColor.rgb / (useAcc * sceneData.accumFrameIndex + 1);
+    color = gamma_correction(color);
     color = clamp(color, 0, 1);
-    
-    imageStore(resultImage, ivec2(gl_GlobalInvocationID.xy), vec4(color, 1));
+
+    imageStore(resultImage, textureCoord, vec4(color.rgb, 1));
 }
