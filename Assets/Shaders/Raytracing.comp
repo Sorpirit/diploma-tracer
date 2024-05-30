@@ -229,6 +229,51 @@ bool hitBHVTree(uint nodeIndex, ray ray, inout HitResult hitResult)
     return hit;
 }
 
+void hitBHVTreeDebug(uint nodeIndex, ray ray, inout HitResult hitResult, inout vec3 color) 
+{
+    uint nodeQueue[32];
+    nodeQueue[0] = nodeIndex;
+    uint quelenght = 1;
+
+    float closestT = infinity;
+    bool hit = false;
+    HitResult currentHit;
+    uint counter = 0;
+
+    uint skipCounter = 3;
+    uint maxCounter = 32;
+
+    while(quelenght > 0)
+    {
+        BHVNode node = nodes[nodeQueue[quelenght - 1]];
+        quelenght--;
+
+        if (!hitAABB(node.aabbMin, node.aabbMax, ray)) 
+        {
+            continue;
+        }
+
+        if(counter < maxCounter)
+        {
+            counter++;
+            //color *= vec3(0.97, 0.36, 0.18);
+        }
+            
+
+        if (node.indeciesCount > 0) {
+            continue;
+        }
+
+        nodeQueue[quelenght++] = node.left;
+        nodeQueue[quelenght++] = node.left + 1;
+    }
+
+    if(counter > skipCounter)
+    {
+        color = mix(vec3(0.16, 0.99, 0.18), vec3(0.97, 0.36, 0.18), float(counter - skipCounter) / 32.0);
+    }
+}
+
 vec3 ray_refract(vec3 rayDirection, vec3 surfaceNormal, float etai_over_etat) {
     float cos_theta = min(dot(-rayDirection, surfaceNormal), 1.0);
     vec3 r_out_parallel = etai_over_etat * (rayDirection + cos_theta * surfaceNormal);
@@ -318,12 +363,24 @@ vec3 TraceRay(ray ray)
             closestHit = currentHit;
         }
 
+        //hitBHVTreeDebug(0, ray, currentHit, color);
         if(hitBHVTree(0, ray, currentHit) && currentHit.hitDistance < closestT && currentHit.hitDistance > 0.001)
         {
             hit = true;
             closestT = currentHit.hitDistance;
             closestHit = currentHit;
         }
+
+        // for(int i = 0; i < indecies.length(); i+= 3)
+        // {
+        //     triangle tri = getTriangle(i);
+        //     if (hitTriangle(tri, ray, currentHit) && currentHit.hitDistance < closestT && currentHit.hitDistance > 0.001)
+        //     {
+        //         hit = true;
+        //         closestT = currentHit.hitDistance;
+        //         closestHit = currentHit;
+        //     }
+        // }
 
         if (hit) 
         {
