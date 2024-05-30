@@ -17,7 +17,12 @@ namespace TracerCore::UI
         uint32_t FPS;
         uint32_t TriCount;
 
+        //todo remove
         glm::vec3 color; 
+        int bounceCount;
+        int renderModel;
+        int moderlsCount;
+        const char* models[3];
     };
 
     class StatisticsWindow : public RenderUILayer

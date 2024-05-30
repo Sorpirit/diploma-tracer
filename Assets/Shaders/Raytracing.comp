@@ -18,6 +18,7 @@ layout(binding = 1, std140) uniform SceneData{
     uint frameIndex;
     uint useAccumulationTexture;
     uint accumFrameIndex;
+    uint maxBounces;
 } sceneData;
 
 layout(binding = 2, rgba32f) uniform image2D accumulationTexture;
@@ -29,12 +30,35 @@ struct triangle {
     vec3 n0;
     vec3 n1;
     vec3 n2;
-    bool precalculatedNormals;
+    uint materialFlag;
+};
+
+struct vertex {
+    vec3 position;
+    vec3 normal;
+    vec2 uv;
     uint materialFlag;
 };
 
 layout(binding = 3, std140) readonly buffer Triangles{
-    triangle triangles[];
+    vertex vertecies[];
+};
+
+layout(binding = 4) readonly buffer Indecies{
+    uint indecies[];
+};
+
+struct BHVNode {
+    vec3 aabbMin;
+    vec3 aabbMax;
+    uint left;
+    // uint32_t right = left + 1; as they are stored consequtevly
+    uint startIndex;
+    uint indeciesCount;
+};
+
+layout(binding = 5, std140) readonly buffer BHVNodes{
+    BHVNode nodes[];
 };
 
 struct ray {
@@ -46,6 +70,7 @@ struct HitResult {
     vec3 hitPoint;
     vec3 normal;
     float hitDistance;
+    bool frontFace;
     uint materialFlag;
 };
 
@@ -55,7 +80,17 @@ struct sphere {
     uint materialFlag;
 };
 
-
+triangle getTriangle(uint startIndex) {
+    return triangle(
+        vertecies[indecies[startIndex]].position,
+        vertecies[indecies[startIndex + 1]].position,
+        vertecies[indecies[startIndex + 2]].position,
+        vertecies[indecies[startIndex]].normal,
+        vertecies[indecies[startIndex + 1]].normal,
+        vertecies[indecies[startIndex + 2]].normal,
+        vertecies[indecies[startIndex]].materialFlag
+    );
+}
 
 bool hitSphere(sphere sphere, ray ray, inout HitResult hitResult){
     //solve sphere equation
@@ -84,7 +119,8 @@ bool hitSphere(sphere sphere, ray ray, inout HitResult hitResult){
 
     hitResult.hitDistance = t0;
     hitResult.hitPoint = hitPoint;
-    hitResult.normal = normal;// dot(normal, ray.direction) >= 0 ? -normal : normal;
+    hitResult.frontFace = dot(ray.direction, normal) < 0;
+    hitResult.normal = hitResult.frontFace ? normal : -normal;
     hitResult.materialFlag = sphere.materialFlag;
 
     return true;
@@ -115,19 +151,136 @@ bool hitTriangle(triangle tri, ray ray, inout HitResult hitResult) {
     hitResult.hitDistance = t;
     hitResult.hitPoint = ray.origin + t * ray.direction;
     hitResult.normal = vec3(u,v,1-u-v);
-    if (!tri.precalculatedNormals)
-        hitResult.normal = normalize(cross(v0v2, v0v1));
-    else
-        hitResult.normal = tri.n1 * u + tri.n2 * v + tri.n0 * (1 - u - v);
+    hitResult.normal = tri.n1 * u + tri.n2 * v + tri.n0 * (1 - u - v);
     
     if(det < 0) 
         hitResult.normal *= -1;
 
+    hitResult.frontFace = dot(ray.direction, hitResult.normal) < 0;
     hitResult.materialFlag = tri.materialFlag;
     
     return true;
 }
 
+bool hitAABB(vec3 aabbMin, vec3 aabbMax, ray ray) {
+
+    if(ray.direction.x == 0 && (ray.origin.x < aabbMin.x || ray.origin.x > aabbMax.x)) return false;
+    if(ray.direction.y == 0 && (ray.origin.y < aabbMin.y || ray.origin.y > aabbMax.y)) return false;
+    if(ray.direction.z == 0 && (ray.origin.z < aabbMin.z || ray.origin.z > aabbMax.z)) return false;
+
+    float tmin = infinity;
+    float tmax = 0;
+
+    vec3 invDir = 1.0 / ray.direction;
+    vec3 t0 = (aabbMin - ray.origin) * invDir;
+    vec3 t1 = (aabbMax - ray.origin) * invDir;
+    vec3 tminv = min(t0, t1);
+    vec3 tmaxv = max(t0, t1);
+
+    tmin = max(tminv.x, max(tminv.y, tminv.z));
+    tmax = min(tmaxv.x, min(tmaxv.y, tmaxv.z));
+    
+    return tmax >= tmin && tmax > 0;
+}
+
+bool hitBHVTree(uint nodeIndex, ray ray, inout HitResult hitResult) 
+{
+    uint nodeQueue[32];
+    nodeQueue[0] = nodeIndex;
+    uint quelenght = 1;
+
+    float closestT = infinity;
+    bool hit = false;
+    HitResult currentHit;
+
+    while(quelenght > 0)
+    {
+        BHVNode node = nodes[nodeQueue[quelenght - 1]];
+        quelenght--;
+
+        if (!hitAABB(node.aabbMin, node.aabbMax, ray)) 
+        {
+            continue;
+        }
+
+        if (node.indeciesCount > 0) {
+            
+            for(int i = 0; i < node.indeciesCount; i+= 3)
+            {
+                triangle tri = getTriangle(node.startIndex + i);
+                if (hitTriangle(tri, ray, currentHit))
+                {
+                    hit = true;
+                    if (currentHit.hitDistance < closestT)
+                    {
+                        closestT = currentHit.hitDistance;
+                        hitResult = currentHit;
+                    }
+                }
+            }
+
+            continue;
+        }
+
+        nodeQueue[quelenght++] = node.left;
+        nodeQueue[quelenght++] = node.left + 1;
+    }
+
+    return hit;
+}
+
+vec3 ray_refract(vec3 rayDirection, vec3 surfaceNormal, float etai_over_etat) {
+    float cos_theta = min(dot(-rayDirection, surfaceNormal), 1.0);
+    vec3 r_out_parallel = etai_over_etat * (rayDirection + cos_theta * surfaceNormal);
+    vec3 r_out_perp = -sqrt(abs(1.0 - dot(r_out_parallel, r_out_parallel))) * surfaceNormal;
+    return r_out_parallel + r_out_perp;
+}
+
+float reflectance(float cosine, float refraction_index) {
+    // Use Schlick's approximation for reflectance.
+    float r0 = (1.0 - refraction_index) / (1.0 + refraction_index);
+    r0 = r0*r0;
+    return r0 + (1.0-r0)*pow((1.0 - cosine),5);
+}
+
+void Scater(HitResult hit, inout ray ray, inout vec3 attenuation)
+{
+    switch(hit.materialFlag)
+    {
+        //lambertian
+        case 0:
+            attenuation *= vec3(0.8, 0.8, 0.0); //albedo
+            ray.origin = hit.hitPoint + hit.normal * 0.01;
+            ray.direction = hit.normal + randomUnitVector();
+            if(dot(ray.direction, hit.normal) < 0.0001) 
+                ray.direction = hit.normal;
+            break;
+
+        //metal            
+        case 1:
+            float fuzz = 0.01;
+            attenuation *= vec3(0.8, 0.8, 0.0); //albedo
+            ray.origin = hit.hitPoint + hit.normal * 0.01;
+            ray.direction = normalize(reflect(ray.direction, hit.normal)) + fuzz * randomUnitVector();
+            break;
+
+        //glass
+        case 2:
+            float refractionIndex = 1.0 / 1.33;
+            //attenuation not changed
+            ray.origin = hit.hitPoint;
+
+            float ri = hit.frontFace ? 1.0 / refractionIndex : refractionIndex;
+            vec3 unitDir = normalize(ray.direction);
+            float cosTheta = min(dot(-unitDir, hit.normal), 1.0);
+            float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+
+            bool cannotRefract = ri * sinTheta > 1.0;
+            vec3 direction = cannotRefract || reflectance(cosTheta, ri) > hash1() ? reflect(unitDir, hit.normal) : ray_refract(unitDir, hit.normal, ri);
+            ray.direction = direction;
+        break;
+    }
+}
 vec3 GetRayDirection(vec2 screenCord)
 {
     vec4 target = sceneData.camInvProjection * vec4(screenCord, 1.0, 1.0);
@@ -139,18 +292,11 @@ vec3 TraceRay(ray ray)
 {
     sphere spheres[3];
 
-    spheres[0] = sphere(vec3(1.8, 0.0, -0.1), 0.5, 2);
-    spheres[1] = sphere(vec3(-1.8, 0.0, -0.1), 0.5, 3);
+    spheres[0] = sphere(vec3(1.8, 0.0, -0.1), 0.5, 0);
+    spheres[1] = sphere(vec3(-1.8, 0.0, -0.1), 0.5, 2);
     spheres[2] = sphere(vec3(0,-100.5, -1), 100, 0);
-
-    vec4 atenuationFuzz[4];
     
-    atenuationFuzz[0] = vec4(0.8, 0.8, 0.0, 0.0);
-    atenuationFuzz[1] = vec4(0.8, 0.6, 0.2, 0.01);
-    atenuationFuzz[2] = vec4(0.1, 0.2, 0.5, 0.4);
-    atenuationFuzz[3] = vec4(0.8, 0.8, 0.8, 1.0);
-    
-    uint maxBounces = 4;
+    uint maxBounces = sceneData.maxBounces;
     vec3 finalColor = vec3(0);
     vec3 color = vec3(1);
         
@@ -160,39 +306,31 @@ vec3 TraceRay(ray ray)
         HitResult closestHit;
         bool hit = false;
         float closestT = infinity;
+        
+
         for(int i = 0; i < spheres.length(); i++)
         {
-            if (hitSphere(spheres[i], ray, currentHit))
-            {
-                hit = true;
-                if (currentHit.hitDistance < closestT)
-                {
-                    closestT = currentHit.hitDistance;
-                    closestHit = currentHit;
-                }
-            }
+            if (!hitSphere(spheres[i], ray, currentHit) || currentHit.hitDistance >= closestT || currentHit.hitDistance < 0.001)
+                continue;
+
+            hit = true;
+            closestT = currentHit.hitDistance;
+            closestHit = currentHit;
         }
 
-        for(int i = 0; i < triangles.length(); i++)
+        if(hitBHVTree(0, ray, currentHit) && currentHit.hitDistance < closestT && currentHit.hitDistance > 0.001)
         {
-            if (hitTriangle(triangles[i], ray, currentHit))
-            {
-                hit = true;
-                if (currentHit.hitDistance < closestT)
-                {
-                    closestT = currentHit.hitDistance;
-                    closestHit = currentHit;
-                }
-            }
+            hit = true;
+            closestT = currentHit.hitDistance;
+            closestHit = currentHit;
         }
 
-        if (hit) {
-            color *= atenuationFuzz[closestHit.materialFlag].xyz;
-            ray.origin = closestHit.hitPoint + closestHit.normal * 0.01;
-            ray.direction = closestHit.materialFlag == 0 ? closestHit.normal + randomUnitVector() : 
-                normalize(reflect(ray.direction, closestHit.normal)) + atenuationFuzz[closestHit.materialFlag].w * randomUnitVector();
+        if (hit) 
+        {
+            Scater(closestHit, ray, color);
         }
-        else {
+        else 
+        {
             vec3 unitDir = normalize(ray.direction);
             float a = 0.5 * (unitDir.y + 1.0);
             vec3 skyColor =  (1.0 - a * vec3(1) + a * sceneData.color);

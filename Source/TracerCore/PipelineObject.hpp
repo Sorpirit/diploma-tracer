@@ -25,6 +25,8 @@ namespace TracerCore
         PipelineObject operator=(const PipelineObject&) = delete;
 
         void Bind(VkCommandBuffer commandBuffer, int imageIndex);
+        
+        inline const std::vector<VkDescriptorSet>& GetDescriptorSets() const { return _descriptorSets; }
 
     private:
         VulkanDevice& _device;

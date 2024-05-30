@@ -6,9 +6,10 @@ namespace TracerUtils::Models
 {
     struct TracerVertex
     {
-        glm::vec3 Position;
-        glm::vec3 Normal;
-        glm::vec2 TextureCoordinate;
+        alignas(16) glm::vec3 Position;
+        alignas(16) glm::vec3 Normal;
+        alignas(8) glm::vec2 TextureCoordinate;
+        alignas(4) uint32_t MaterialFlag = 1;
     };
 
     struct TrianglePolygon
@@ -22,6 +23,8 @@ namespace TracerUtils::Models
         
         alignas(4) bool PrecalculatedNormals = 0;
         alignas(4) uint32_t MaterialFlag = 1;
+
+        alignas(16) glm::vec3 Center;
     };
 
 }

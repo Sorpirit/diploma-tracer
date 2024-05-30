@@ -26,12 +26,12 @@ namespace TracerCore
         void CreateDescriptorSets(VkDescriptorPool pool, VkDescriptorSetLayout descriptorSetLayout, int setCount, std::vector<VkDescriptorSet>& descriptorSets);
 
         void UploadBuffer(
-            std::vector<VkDescriptorSet>& descriptorSets, 
+            const std::vector<VkDescriptorSet>& descriptorSets, 
             int dtsBinding, 
             VkDescriptorType descriptorType, 
             const Resources::VulkanBuffer* buffer);
         void UploadTexture(
-            std::vector<VkDescriptorSet>& descriptorSets, 
+            const std::vector<VkDescriptorSet>& descriptorSets, 
             int dtsBinding, 
             VkImageLayout targetLayout,
             VkDescriptorType descriptorType, 

@@ -55,7 +55,7 @@ namespace TracerCore
         }
     }
 
-    void ShaderReosuceManager::UploadBuffer(std::vector<VkDescriptorSet>& descriptorSets, int dtsBinding, VkDescriptorType descriptorType, 
+    void ShaderReosuceManager::UploadBuffer(const std::vector<VkDescriptorSet>& descriptorSets, int dtsBinding, VkDescriptorType descriptorType, 
             const Resources::VulkanBuffer* buffer)
     {
         for (size_t i = 0; i < descriptorSets.size(); i++) 
@@ -80,7 +80,7 @@ namespace TracerCore
         }
     }
 
-    void ShaderReosuceManager::UploadTexture(std::vector<VkDescriptorSet>& descriptorSets, int dtsBinding, VkImageLayout targetLayout, VkDescriptorType descriptorType, const Resources::Texture2D* texture)
+    void ShaderReosuceManager::UploadTexture(const std::vector<VkDescriptorSet>& descriptorSets, int dtsBinding, VkImageLayout targetLayout, VkDescriptorType descriptorType, const Resources::Texture2D* texture)
     {
         for (size_t i = 0; i < descriptorSets.size(); i++) 
         {

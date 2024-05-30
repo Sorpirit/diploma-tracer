@@ -62,8 +62,15 @@ namespace TracerCore
         _frameData.InvProjection = _camera.GetInvProjection();
         _frameData.View = _camera.GetView();
         _frameData.InvView = _camera.GetInvView();
+        _frameData.BounceCount = 4;
 
         _frameStats.color = _frameData.Color;
+        _frameStats.models[0] = "Cube";
+        _frameStats.models[1] = "Chiken";
+        _frameStats.models[2] = "Croissant";
+        _frameStats.moderlsCount = 3;
+        _frameStats.bounceCount = 4;
+        _frameStats.renderModel = 0;
 
         CreateBuffers();
         CreateOnScreenPipelines();
@@ -95,6 +102,8 @@ namespace TracerCore
         float currentFrame = 0.0f;
 
         uint32_t accumStartFrameIndex = 0;
+
+        int selectedModel = 0;
 
         while(_mainWindow.ShouldClose()) {
             currentFrame = glfwGetTime();
@@ -131,6 +140,13 @@ namespace TracerCore
 
             _frameData.Color = _frameStats.color;
 
+            if(_frameStats.renderModel != selectedModel)
+            {
+                //TODO change model
+            }
+
+            _frameData.BounceCount = _frameStats.bounceCount;
+
             VkDeviceSize size = sizeof(FrameData);
             memcpy(_frameDataPtr, &_frameData, size);
             
@@ -145,40 +161,12 @@ namespace TracerCore
 
     void Tracer::LoadModels()
     {
-        auto triangles = Cube();
-        size_t triangleBufferSize = sizeof(TracerUtils::Models::TrianglePolygon) * triangles.size();
-        _triangleBuffer = Resources::VulkanBuffer::CreateBuffer(_device, triangleBufferSize, 
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_HEAP_DEVICE_LOCAL_BIT);
-        
-        void* data;
-        _triangleBuffer->MapMemory(triangleBufferSize, 0, &data);
-        memcpy(data, triangles.data(), triangleBufferSize);
-        _triangleBuffer->UnmapMemory();
+        auto cube = TracerUtils::IOHelpers::LoadModel("Models\\cube.fbx");
+        // auto cheken = TracerUtils::IOHelpers::LoadModel("Models\\Chicken_02.obj");
+        // auto croisant = TracerUtils::IOHelpers::LoadModel("Models\\Croissant.fbx");
 
-        //auto model = TracerUtils::IOHelpers::LoadModel("Models\\blneder_suzanne.fbx");
-        
-        //auto model = TracerUtils::IOHelpers::LoadModel("Models\\sphere.fbx");
-        //auto model = TracerUtils::IOHelpers::LoadModel("Models\\Chicken_01.obj");
-        
-        //auto model = TracerUtils::IOHelpers::LoadModel("Models\\Goat_01.obj");
-        //auto model = TracerUtils::IOHelpers::LoadModel("Models\\Cow.fbx");
-
-        //auto model = TracerUtils::IOHelpers::LoadModel("Models\\cube.fbx");
-        auto model = TracerUtils::IOHelpers::LoadModel("Models\\Chicken_02.obj");
-
-        auto modelPolygon = model.GetTriangles();
-        auto modelBufferSize = sizeof(TracerUtils::Models::TrianglePolygon) * modelPolygon->size();
-        _frameStats.TriCount = modelPolygon->size();
-        
-        _modelBuffer = Resources::VulkanBuffer::CreateBuffer(_device, modelBufferSize, 
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_HEAP_DEVICE_LOCAL_BIT);
-        
-        _modelBuffer->MapMemory(modelBufferSize, 0, &data);
-        memcpy(data, modelPolygon->data(), modelBufferSize);
-        _modelBuffer->UnmapMemory();
-        delete modelPolygon;
+        _scene.AddModel(cube);
+        _scene.BuildScene();
     }
 
     void Tracer::LoadImages()
@@ -280,31 +268,46 @@ namespace TracerCore
         VkDescriptorPoolSize poolSizes[] = {
             {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, imageCount * 2},
             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, imageCount},
-            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, imageCount},
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, imageCount * 3},
         };
 
-        const int bindingCount = 4;
+        const int bindingCount = 6;
         VkDescriptorSetLayoutBinding layoutBindings[bindingCount];
         layoutBindings[0].binding = 0;
         layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         layoutBindings[0].descriptorCount = 1;
         layoutBindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
         layoutBindings[0].pImmutableSamplers = nullptr;
+        
         layoutBindings[1].binding = 1;
         layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         layoutBindings[1].descriptorCount = 1;
         layoutBindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
         layoutBindings[1].pImmutableSamplers = nullptr;
+        
         layoutBindings[2].binding = 2;
         layoutBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         layoutBindings[2].descriptorCount = 1;
         layoutBindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
         layoutBindings[2].pImmutableSamplers = nullptr;
+        
         layoutBindings[3].binding = 3;
         layoutBindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         layoutBindings[3].descriptorCount = 1;
         layoutBindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
         layoutBindings[3].pImmutableSamplers = nullptr;
+        
+        layoutBindings[4].binding = 4;
+        layoutBindings[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        layoutBindings[4].descriptorCount = 1;
+        layoutBindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        layoutBindings[4].pImmutableSamplers = nullptr;
+        
+        layoutBindings[5].binding = 5;
+        layoutBindings[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        layoutBindings[5].descriptorCount = 1;
+        layoutBindings[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        layoutBindings[5].pImmutableSamplers = nullptr;
 
         _shaderResourceManager.CreateDescriptorPool(poolSizes, 1, imageCount, descriptorPool);
         _shaderResourceManager.CreateDescriptorSetLayout(layoutBindings, bindingCount, setLayout);
@@ -317,7 +320,10 @@ namespace TracerCore
         _shaderResourceManager.UploadTexture(descriptorSets, 0, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, _computeTexture.get());
         _shaderResourceManager.UploadBuffer(descriptorSets, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, _framedataBuffer.get());
         _shaderResourceManager.UploadTexture(descriptorSets, 2, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, _accumulationTexture.get());
-        _shaderResourceManager.UploadBuffer(descriptorSets, 3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, _modelBuffer.get());
+        
+        _shaderResourceManager.UploadBuffer(descriptorSets, 3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, _scene.GetVertexBuffer());
+        _shaderResourceManager.UploadBuffer(descriptorSets, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, _scene.GetIndexBuffer());
+        _shaderResourceManager.UploadBuffer(descriptorSets, 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, _scene.GetBHVTree().GetNodesBuffer());
 
         _computePipeline = std::make_unique<PipelineObject>(
             _device,

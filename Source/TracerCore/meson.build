@@ -5,6 +5,7 @@ tracer_core_src = files([
     'SwapChain.cpp', 
     'Tracer.cpp', 
     'PipelineObject.cpp', 
+    'TracerScene.cpp',
     'Model.cpp', 
     'Raytracer.cpp', 
     'ShaderReosuceManager.cpp', 
@@ -16,7 +17,8 @@ tracer_core_src = files([
     'UI/UILayer.cpp',
     'UI/CamerUIControl.cpp',
     'UI/StatisicUILayer.cpp',
-    'TracerCamera.cpp'
+    'TracerCamera.cpp',
+    'BHVTree.cpp',
 ])
 
 

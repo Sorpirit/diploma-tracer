@@ -19,6 +19,8 @@
 #include "TracerCamera.hpp"
 #include "TracerIO.hpp"
 #include "UI/StatisicUILayer.hpp"
+#include "TracerScene.hpp"
+#include "BHVTree.hpp"
 
 namespace TracerCore
 {
@@ -34,6 +36,8 @@ namespace TracerCore
 
         alignas(4) uint32_t UseAccumTexture;
         alignas(4) uint32_t AccumFrameIndex; 
+
+        alignas(4) uint32_t BounceCount;
     };
 
     class Tracer
@@ -67,6 +71,9 @@ namespace TracerCore
         VulkanDevice _device{_mainWindow};
         ShaderReosuceManager _shaderResourceManager{_device};
         PipelineManager _pipelineManager{_device};
+
+        TracerScene _scene{_device};
+
         Raytracer _raytracer;
 
         TracerCamera _camera;
@@ -80,12 +87,12 @@ namespace TracerCore
         std::unique_ptr<UI::UILayer> _uiLayer;
 
         std::unique_ptr<Resources::Texture2D> _texture2d;
+        
         std::unique_ptr<Resources::Texture2D> _computeTexture;
         std::unique_ptr<Resources::Texture2D> _accumulationTexture;
 
         std::unique_ptr<Resources::VulkanBuffer> _framedataBuffer;
         std::unique_ptr<Resources::VulkanBuffer> _triangleBuffer;
-        std::unique_ptr<Resources::VulkanBuffer> _modelBuffer;
 
         std::unique_ptr<PipelineObject> _graphicsPipeline;
         std::unique_ptr<PipelineObject> _computePipeline;

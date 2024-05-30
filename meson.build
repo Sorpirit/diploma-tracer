@@ -9,7 +9,7 @@ if get_option('tracy_enable')
 endif
 
 #Libraries
-vulkan_lib_dir = 'C:\\VulkanSDK\\1.3.280.0'
+vulkan_lib_dir = 'C:\\VulkanSDK\\1.3.283.0'
 glfw_lib_dir = 'Libraries\\glfw-3.4.bin.WIN64'
 
 cpp = meson.get_compiler('cpp')
