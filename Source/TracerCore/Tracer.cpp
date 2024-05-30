@@ -161,11 +161,11 @@ namespace TracerCore
 
     void Tracer::LoadModels()
     {
-        auto cube = TracerUtils::IOHelpers::LoadModel("Models\\cube.fbx");
-        // auto cheken = TracerUtils::IOHelpers::LoadModel("Models\\Chicken_02.obj");
-        // auto croisant = TracerUtils::IOHelpers::LoadModel("Models\\Croissant.fbx");
+        //auto cube = TracerUtils::IOHelpers::LoadModel("Models\\cube.fbx");
+        //auto cheken = TracerUtils::IOHelpers::LoadModel("Models\\Chicken_02.obj");
+        auto croisant = TracerUtils::IOHelpers::LoadModel("Models\\Croissant.fbx");
 
-        _scene.AddModel(cube);
+        _scene.AddModel(croisant);
         _scene.BuildScene();
     }
 
