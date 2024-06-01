@@ -20,7 +20,6 @@
 #include "TracerIO.hpp"
 #include "UI/StatisicUILayer.hpp"
 #include "TracerScene.hpp"
-#include "BHVTree.hpp"
 
 namespace TracerCore
 {
@@ -38,6 +37,10 @@ namespace TracerCore
         alignas(4) uint32_t AccumFrameIndex; 
 
         alignas(4) uint32_t BounceCount;
+
+        //scene data
+        alignas(16) glm::vec3 aabbMin;
+        alignas(16) glm::vec3 aabbMax;
     };
 
     class Tracer

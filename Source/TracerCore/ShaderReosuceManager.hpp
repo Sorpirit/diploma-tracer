@@ -29,13 +29,13 @@ namespace TracerCore
             const std::vector<VkDescriptorSet>& descriptorSets, 
             int dtsBinding, 
             VkDescriptorType descriptorType, 
-            const Resources::VulkanBuffer* buffer);
+            const Resources::VulkanBuffer* buffer) const;
         void UploadTexture(
             const std::vector<VkDescriptorSet>& descriptorSets, 
             int dtsBinding, 
             VkImageLayout targetLayout,
             VkDescriptorType descriptorType, 
-            const Resources::Texture2D* texture);
+            const Resources::Texture2D* texture) const;
             
     private:
         void Init();

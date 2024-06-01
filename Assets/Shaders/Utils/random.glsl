@@ -1,3 +1,6 @@
+#ifndef RANDOM_H
+#define RANDOM_H
+
 uint gState = 78213298; // global state
 
 uint pcg_hash() {
@@ -33,3 +36,5 @@ vec3 inUnitSphere(){
 vec3 randomUnitVector() {
     return normalize(inUnitSphere());
 }
+
+#endif // RANDOM_H

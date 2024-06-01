@@ -1,24 +1,33 @@
 #include "BHVTree.hpp"
 
-namespace TracerCore
+namespace TracerCore::AccelerationStructures
 {
-    BHVTree::BHVTree(VulkanDevice &_device, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices) : _device(_device), _nodeCount(0)
+    BHVTree::BHVTree(VulkanDevice &_device, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices) : 
+        AccelerationStructure(_device, vertices, indices)
     {
+        std::vector<uint32_t> indicesCopy;
+        indicesCopy.insert(indicesCopy.begin(), indices.begin(), indices.end()); 
+
         BHVNode rootNode;
         rootNode.aabbMin = glm::vec3(0.0f);
         rootNode.aabbMax = glm::vec3(0.0f);
         rootNode.left = 0;
         rootNode.startIndex = 0;
-        rootNode.indeciesCount = indices.size();
-        InsertNode(rootNode, vertices, indices);
-        SubdivideNode(0, vertices, indices, 1);
+        rootNode.indeciesCount = indicesCopy.size();
+        InsertNode(rootNode, vertices, indicesCopy);
+        SubdivideNode(0, vertices, indicesCopy, 1);
 
         _nodesBuffer = Resources::VulkanBuffer::CreateBuffer(_device, sizeof(BHVNode) * _nodes.size(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        _indeciesBuffer = Resources::VulkanBuffer::CreateBuffer(_device, sizeof(uint32_t) * indicesCopy.size(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
         void* data;
         _nodesBuffer->MapMemory(sizeof(BHVNode) * _nodes.size(), 0, &data);
         memcpy(data, _nodes.data(), sizeof(BHVNode) * _nodes.size());
         _nodesBuffer->UnmapMemory();
+
+        _indeciesBuffer->MapMemory(sizeof(uint32_t) * indicesCopy.size(), 0, &data);
+        memcpy(data, indicesCopy.data(), sizeof(uint32_t) * indicesCopy.size());
+        _indeciesBuffer->UnmapMemory();
     }
 
     BHVTree::~BHVTree()

@@ -1,5 +1,8 @@
 #include "TracerScene.hpp"
 
+#include "AccelerationStructures/BHVTree.hpp"
+#include "AccelerationStructures/KdTree.hpp"
+
 namespace TracerCore
 {
 
@@ -27,10 +30,16 @@ namespace TracerCore
             indices.insert(indices.end(), model->Indices.begin(), model->Indices.end());
         }
 
+        for (const auto vertex : vertecies)
+        {
+            _aabbMin = glm::min(_aabbMin, vertex.Position);
+            _aabbMax = glm::max(_aabbMax, vertex.Position);
+        }
+
         _models.clear();
 
-        //BHV tree reorders scene indices to optimize ray tracing. So it need to be built before uploading data to GPU
-        _bhvTree = std::make_unique<BHVTree>(_device, vertecies, indices);
+        //_accBHVStructure = std::make_unique<AccelerationStructures::BHVTree>(_device, vertecies, indices);
+        _accKdTreeStructure = std::make_unique<AccelerationStructures::KdTree>(_device, vertecies, indices);
 
         //Upload scene data to GPU
         VkDeviceSize verteciesSize = sizeof(TracerUtils::Models::TracerVertex) * vertecies.size();
@@ -52,6 +61,21 @@ namespace TracerCore
         _indexBuffer->MapMemory(indicesSize, 0, &data);
         memcpy(data, indices.data(), indicesSize);
         _indexBuffer->UnmapMemory();
+    }
+
+    void TracerScene::AttachSceneGeometry(const ShaderReosuceManager &resourceManager, std::vector<VkDescriptorSet> &descriptosSets) const
+    {
+        resourceManager.UploadBuffer(descriptosSets, 3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, _vertexBuffer.get());
+        
+        if(_accStructure != nullptr)
+        {
+            resourceManager.UploadBuffer(descriptosSets, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, _accStructure->GetIndicesBuffer());
+            resourceManager.UploadBuffer(descriptosSets, 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, _accStructure->GetNodesBuffer());
+        }
+        else
+        {
+            resourceManager.UploadBuffer(descriptosSets, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, _indexBuffer.get());
+        }
     }
 
 } // namespace TacerCore

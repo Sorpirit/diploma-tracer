@@ -44,7 +44,6 @@ namespace TracerCore
         return triangles;
     }
     
-
     Tracer::Tracer()
     {
         ZoneScoped;
@@ -53,7 +52,7 @@ namespace TracerCore
         LoadImages();
 
         auto extent = _mainWindow.GetExtent();
-        _camera.SetParameters(glm::vec3(0, 0, 0), glm::vec3(0, 0, -1));
+        _camera.SetParameters(glm::vec3(0, 0, 10), glm::vec3(0, 0, -1));
         _camera.SetProjection(glm::radians(95.0f), extent.width / (float) extent.height, 0.1f, 150.0f);
 
         _frameData.Color = glm::vec3(0.5, 0.7, 1.0);
@@ -63,6 +62,10 @@ namespace TracerCore
         _frameData.View = _camera.GetView();
         _frameData.InvView = _camera.GetInvView();
         _frameData.BounceCount = 4;
+
+        //kd tree
+        _frameData.aabbMin = _scene.GetAABBMin();
+        _frameData.aabbMax = _scene.GetAABBMax();
 
         _frameStats.color = _frameData.Color;
         _frameStats.models[0] = "Cube";
@@ -163,10 +166,12 @@ namespace TracerCore
     {
         //auto cube = TracerUtils::IOHelpers::LoadModel("Models\\cube.fbx");
         //auto cheken = TracerUtils::IOHelpers::LoadModel("Models\\Chicken_02.obj");
-        auto croisant = TracerUtils::IOHelpers::LoadModel("Models\\Croissant.fbx");
+        auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\blneder_suzanne.fbx");
+        //auto croisant = TracerUtils::IOHelpers::LoadModel("Models\\Croissant.fbx");
 
-        _scene.AddModel(croisant);
+        _scene.AddModel(monkey);
         _scene.BuildScene();
+        _scene.SetAccMode(AccStructureType::AccStructure_KdTree);
     }
 
     void Tracer::LoadImages()
@@ -278,15 +283,15 @@ namespace TracerCore
         layoutBindings[0].descriptorCount = 1;
         layoutBindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
         layoutBindings[0].pImmutableSamplers = nullptr;
-        
+                
         layoutBindings[1].binding = 1;
-        layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         layoutBindings[1].descriptorCount = 1;
         layoutBindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
         layoutBindings[1].pImmutableSamplers = nullptr;
-        
+
         layoutBindings[2].binding = 2;
-        layoutBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        layoutBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         layoutBindings[2].descriptorCount = 1;
         layoutBindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
         layoutBindings[2].pImmutableSamplers = nullptr;
@@ -315,15 +320,13 @@ namespace TracerCore
 
         _pipelineManager.CreatePipelineLayout(setLayout, &pipelineLayout);
 
-        _pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\Raytracing.comp.spv", &computePipeline);
+        _pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\RaytraceKdTree.comp.spv", &computePipeline);
 
         _shaderResourceManager.UploadTexture(descriptorSets, 0, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, _computeTexture.get());
-        _shaderResourceManager.UploadBuffer(descriptorSets, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, _framedataBuffer.get());
-        _shaderResourceManager.UploadTexture(descriptorSets, 2, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, _accumulationTexture.get());
+        _shaderResourceManager.UploadTexture(descriptorSets, 1, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, _accumulationTexture.get());
+        _shaderResourceManager.UploadBuffer(descriptorSets, 2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, _framedataBuffer.get());
         
-        _shaderResourceManager.UploadBuffer(descriptorSets, 3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, _scene.GetVertexBuffer());
-        _shaderResourceManager.UploadBuffer(descriptorSets, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, _scene.GetIndexBuffer());
-        _shaderResourceManager.UploadBuffer(descriptorSets, 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, _scene.GetBHVTree().GetNodesBuffer());
+        _scene.AttachSceneGeometry(_shaderResourceManager, descriptorSets);
 
         _computePipeline = std::make_unique<PipelineObject>(
             _device,

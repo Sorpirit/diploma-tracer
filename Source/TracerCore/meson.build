@@ -18,7 +18,9 @@ tracer_core_src = files([
     'UI/CamerUIControl.cpp',
     'UI/StatisicUILayer.cpp',
     'TracerCamera.cpp',
-    'BHVTree.cpp',
+    'AccelerationStructures/BHVTree.cpp',
+    'AccelerationStructures/KdTree.cpp'
 ])
 
+trace_core_includes = include_directories('.')
 

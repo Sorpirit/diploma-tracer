@@ -1,3 +1,6 @@
+#ifndef COLOR_H
+#define COLOR_H
+
 float gamma_correction(float linearComponent){
     return pow(linearComponent, 1.0/2.2);
 }
@@ -9,3 +12,5 @@ vec3 gamma_correction(vec3 linearColor)
                 gamma_correction(linearColor.y),
                 gamma_correction(linearColor.z));
 }
+
+#endif // COLOR_H

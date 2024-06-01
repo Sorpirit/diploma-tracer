@@ -46,28 +46,28 @@ namespace TracerCore {
         VulkanDevice &operator=(VulkanDevice &&) = delete;
 
         /// @brief Getter for Vulkan instance.
-        inline VkInstance GetVkInstance() { return _instance; }
+        inline VkInstance GetVkInstance() const { return _instance; }
 
         /// @brief Getter for Vulkan logical device.
-        inline VkDevice GetVkDevice() { return _device; }
+        inline VkDevice GetVkDevice() const { return _device; }
 
         /// @brief Getter for Vulkan physical device.
-        inline VkPhysicalDevice GetPhysicalDevice() { return _physicalDevice; }
+        inline VkPhysicalDevice GetPhysicalDevice() const { return _physicalDevice; }
 
         /// @brief Returns window surface for rendering.
-        inline VkSurfaceKHR GetSurface() { return _surface; }
+        inline VkSurfaceKHR GetSurface() const { return _surface; }
 
         /// @brief Retruns pointer to Graphics Queue.
-        inline VkQueue GetGraphicsQueue() { return _graphicsQueue; }
+        inline VkQueue GetGraphicsQueue() const { return _graphicsQueue; }
 
         /// @brief Returns pointer to Present Queue.
-        inline VkQueue GetPresentQueue() { return _presentQueue; }
+        inline VkQueue GetPresentQueue() const { return _presentQueue; }
 
         /// @brief Get the swap chain support details for the currently selected physical device. Must be called after the physical device is selected.
         /// @return SwapChainSupportDetails struct with the swap chain support details.
         inline SwapChainSupportDetails GetSwapChainSupport() { return QuerySwapChainSupport(_physicalDevice); }
 
-        VkCommandPool getCommandPool() { return commandPool; }
+        VkCommandPool getCommandPool() const { return commandPool; }
 
         uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
