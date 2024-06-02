@@ -9,9 +9,9 @@
 struct BHVNode {
     vec3 aabbMin;
     vec3 aabbMax;
-    uint left;
-    // uint32_t right = left + 1; as they are stored consequtevly
-    uint startIndex;
+
+    // if indeciesCount > 0 then this is a leaf node so nextIndex means offset in the indecies buffer. If indeciesCount == 0 then this is a branch node so nextIndex means offset in the nodes buffer
+    uint nextIndex;
     uint indeciesCount;
 };
 
@@ -21,32 +21,39 @@ layout(binding = 5, std140) readonly buffer BHVNodes{
 
 bool hitBHVTree(uint nodeIndex, ray ray, float tMin, inout float tMax, inout HitResult hitResult) 
 {
-    uint nodeQueue[32];
-    nodeQueue[0] = nodeIndex;
-    uint quelenght = 1;
-
     float bhvTMin = infinity;
     float bhvTMax = tMax;
 
     bool hit = false;
     HitResult currentHit;
 
+    BHVNode root = nodes[nodeIndex];
+    AABB rootAABB = AABB(root.aabbMin, root.aabbMax);
+    if (!hitAABB(rootAABB, ray, bhvTMin, bhvTMax) || bhvTMin > tMax) 
+    {
+        return false;
+    }
+
+    uint nodeQueue[64];
+    nodeQueue[0] = nodeIndex;
+    uint quelenght = 1;
+
     while(quelenght > 0)
     {
-        BHVNode node = nodes[nodeQueue[quelenght - 1]];
-        AABB aabb = AABB(node.aabbMin, node.aabbMax);
+        root = nodes[nodeQueue[quelenght - 1]];
+        rootAABB = AABB(root.aabbMin, root.aabbMax);
         quelenght--;
 
-        if (!hitAABB(aabb, ray, bhvTMin, bhvTMax) || bhvTMin > tMax) 
+        if (!hitAABB(rootAABB, ray, bhvTMin, bhvTMax) || bhvTMin > tMax) 
         {
             continue;
         }
 
-        if (node.indeciesCount > 0) {
+        if (root.indeciesCount > 0) {
             
-            for(int i = 0; i < node.indeciesCount; i+= 3)
+            for(int i = 0; i < root.indeciesCount; i+= 3)
             {
-                triangle tri = getTriangle(node.startIndex + i);
+                triangle tri = getTriangle(root.nextIndex + i);
                 if (hitTriangle(tri, ray, tMin, tMax, currentHit))
                 {
                     hit = true;
@@ -57,8 +64,27 @@ bool hitBHVTree(uint nodeIndex, ray ray, float tMin, inout float tMax, inout Hit
             continue;
         }
 
-        nodeQueue[quelenght++] = node.left;
-        nodeQueue[quelenght++] = node.left + 1;
+        // Primtive queing
+        // nodeQueue[quelenght++] = root.nextIndex;
+        // nodeQueue[quelenght++] = root.nextIndex + 1;
+
+        // Aproximate closest primitive queing
+        uint childLeftIndex = root.nextIndex;
+        uint childRightIndex = root.nextIndex + 1;
+        vec3 aabbLeftDist = nodes[childLeftIndex].aabbMin - ray.origin;
+        vec3 aabbRightDist = nodes[childRightIndex].aabbMin - ray.origin;
+        float sqrDstLeft = dot(aabbLeftDist, aabbLeftDist);
+        float sqrDstRight = dot(aabbRightDist, aabbRightDist);
+        if(sqrDstLeft < sqrDstRight)
+        {
+            nodeQueue[quelenght++] = childRightIndex;
+            nodeQueue[quelenght++] = childLeftIndex;
+        }
+        else
+        {
+            nodeQueue[quelenght++] = childLeftIndex;
+            nodeQueue[quelenght++] = childRightIndex;
+        }
     }
 
     return hit;

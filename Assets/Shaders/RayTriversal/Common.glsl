@@ -11,6 +11,7 @@ struct AABB {
 struct ray {
     vec3 origin;
     vec3 direction;
+    vec3 invDirection;
 };
 
 struct HitResult {
@@ -104,13 +105,12 @@ bool hitTriangle(triangle tri, ray ray, float tMin, inout float tMax, inout HitR
 
 bool hitAABB(AABB aabb, ray ray, inout float tStart, inout float tEnd) 
 {
-    if(ray.direction.x == 0 && (ray.origin.x < aabb.aabbMin.x || ray.origin.x > aabb.aabbMax.x)) return false;
-    if(ray.direction.y == 0 && (ray.origin.y < aabb.aabbMin.y || ray.origin.y > aabb.aabbMax.y)) return false;
-    if(ray.direction.z == 0 && (ray.origin.z < aabb.aabbMin.z || ray.origin.z > aabb.aabbMax.z)) return false;
+    // if(ray.direction.x == 0 && (ray.origin.x < aabb.aabbMin.x || ray.origin.x > aabb.aabbMax.x)) return false;
+    // if(ray.direction.y == 0 && (ray.origin.y < aabb.aabbMin.y || ray.origin.y > aabb.aabbMax.y)) return false;
+    // if(ray.direction.z == 0 && (ray.origin.z < aabb.aabbMin.z || ray.origin.z > aabb.aabbMax.z)) return false;
 
-    vec3 invDir = 1.0 / ray.direction;
-    vec3 t0 = (aabb.aabbMin - ray.origin) * invDir;
-    vec3 t1 = (aabb.aabbMax - ray.origin) * invDir;
+    vec3 t0 = (aabb.aabbMin - ray.origin) * ray.invDirection;
+    vec3 t1 = (aabb.aabbMax - ray.origin) * ray.invDirection;
     vec3 tminv = min(t0, t1);
     vec3 tmaxv = max(t0, t1);
 

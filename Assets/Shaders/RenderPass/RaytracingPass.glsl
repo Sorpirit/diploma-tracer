@@ -81,11 +81,12 @@ vec3 GetRayDirection(vec2 screenCord)
 
 vec3 TraceRay(ray ray)
 {
-    sphere spheres[3];
+    sphere spheres[1];
 
-    spheres[0] = sphere(vec3(1.8, 0.0, -0.1), 0.5, 0);
-    spheres[1] = sphere(vec3(-1.8, 0.0, -0.1), 0.5, 2);
-    spheres[2] = sphere(vec3(0,-100.5, -1), 100, 0);
+    spheres[0] = sphere(vec3(0,-100.5, -1), 100, 0);
+    // spheres[1] = sphere(vec3(1.8, 0.0, -0.1), 0.5, 0);
+    // spheres[2] = sphere(vec3(-1.8, 0.0, -0.1), 0.5, 2);
+    
     
     uint maxBounces = sceneData.maxBounces;
 
@@ -155,7 +156,8 @@ void main()
     vec3 frameColor = vec3(0);    
     for(int i = 0; i < samplesPerPixel; i++) {
         vec3 dir = GetRayDirection(screenCord) + influence * hash3();
-        ray ray = ray(origin, dir);
+        vec3 invDir = 1.0 / dir;
+        ray ray = ray(origin, dir, invDir);
         frameColor += TraceRay(ray);
     }
     frameColor /= samplesPerPixel;

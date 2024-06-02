@@ -52,7 +52,9 @@ namespace TracerCore
         LoadImages();
 
         auto extent = _mainWindow.GetExtent();
-        _camera.SetParameters(glm::vec3(0, 0, 10), glm::vec3(0, 0, -1));
+        glm::vec3 position = glm::vec3(2, 0, .4);
+        glm::vec3 target = glm::vec3(0, .5, 0);
+        _camera.SetParameters(position, glm::normalize(target - position));
         _camera.SetProjection(glm::radians(95.0f), extent.width / (float) extent.height, 0.1f, 150.0f);
 
         _frameData.Color = glm::vec3(0.5, 0.7, 1.0);
@@ -166,12 +168,14 @@ namespace TracerCore
     {
         //auto cube = TracerUtils::IOHelpers::LoadModel("Models\\cube.fbx");
         //auto cheken = TracerUtils::IOHelpers::LoadModel("Models\\Chicken_02.obj");
-        auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\blneder_suzanne.fbx");
+        //auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\blneder_suzanne.fbx");
+        auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\sportsCar.obj");
+        //auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\Cow.fbx");
         //auto croisant = TracerUtils::IOHelpers::LoadModel("Models\\Croissant.fbx");
 
         _scene.AddModel(monkey);
         _scene.BuildScene();
-        _scene.SetAccMode(AccStructureType::AccStructure_KdTree);
+        _scene.SetAccMode(AccStructureType::AccStructure_BVH);
     }
 
     void Tracer::LoadImages()
@@ -320,7 +324,8 @@ namespace TracerCore
 
         _pipelineManager.CreatePipelineLayout(setLayout, &pipelineLayout);
 
-        _pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\RaytraceKdTree.comp.spv", &computePipeline);
+        //_pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\RaytraceKdTree.comp.spv", &computePipeline);
+        _pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\RaytraceBHVTree.comp.spv", &computePipeline);
 
         _shaderResourceManager.UploadTexture(descriptorSets, 0, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, _computeTexture.get());
         _shaderResourceManager.UploadTexture(descriptorSets, 1, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, _accumulationTexture.get());
