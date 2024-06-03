@@ -169,13 +169,14 @@ namespace TracerCore
         //auto cube = TracerUtils::IOHelpers::LoadModel("Models\\cube.fbx");
         //auto cheken = TracerUtils::IOHelpers::LoadModel("Models\\Chicken_02.obj");
         //auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\blneder_suzanne.fbx");
-        auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\sportsCar.obj");
+        //auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\bunny.fbx");
         //auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\Cow.fbx");
-        //auto croisant = TracerUtils::IOHelpers::LoadModel("Models\\Croissant.fbx");
+        auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\sportsCar.obj");
 
         _scene.AddModel(monkey);
         _scene.BuildScene();
         _scene.SetAccMode(AccStructureType::AccStructure_BVH);
+        std::cout << "Scene builded\n";
     }
 
     void Tracer::LoadImages()

@@ -21,7 +21,7 @@ namespace TracerCore::AccelerationStructures
         rootNode.nextIndex = 0;
         rootNode.indeciesCount = indicesCopy.size();
         InsertNode(rootNode, vertices, indicesCopy);
-        SubdivideNode(0, vertices, indicesCopy, 1);
+        SubdivideNode(0, centroids, vertices, indicesCopy, 1);
 
         _nodesBuffer = Resources::VulkanBuffer::CreateBuffer(_device, sizeof(BHVNode) * _nodes.size(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         _indeciesBuffer = Resources::VulkanBuffer::CreateBuffer(_device, sizeof(uint32_t) * indicesCopy.size(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -57,77 +57,26 @@ namespace TracerCore::AccelerationStructures
         _nodes.push_back(node);
     }
 
-    void BHVTree::SubdivideNode(uint32_t parentNodeIndex, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices, uint32_t depth)
+    void BHVTree::SubdivideNode(uint32_t parentNodeIndex, std::vector<glm::vec3> allCentroids, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices, uint32_t depth)
     {
         if(depth > 64)
             return;
 
         BHVNode& parentNode = _nodes[parentNodeIndex];
-        glm::vec3 aabbSize = parentNode.aabbMax - parentNode.aabbMin;
-        float parentSurfaceArea = 2.0f * (aabbSize.x * aabbSize.y + aabbSize.x * aabbSize.z + aabbSize.y * aabbSize.z);
-        float parentCost = (parentNode.indeciesCount / 3) * parentSurfaceArea;
-
-        int bestAxis = -1;
+        uint32_t bestAxis = -1;
         float bestCost = FLT_MAX;
         float bestSplitPos = 0.0f;
 
-        //SAH
-        // {
-        //     for (size_t axis = 0; axis < 3; axis++)
-        //     {
-        //         for (size_t j = 0; j < parentNode.indeciesCount; j+=3)
-        //         {
-        //             uint32_t currentIndecie = parentNode.nextIndex + j;
-        //             glm::vec3 triCenter = 0.333333f * (
-        //                 vertices[indices[currentIndecie]].Position + 
-        //                 vertices[indices[currentIndecie + 1]].Position + 
-        //                 vertices[indices[currentIndecie + 2]].Position);
-
-        //             float splitPos = triCenter[axis];
-        //             float cost = CalculateSAH(parentNodeIndex, axis, splitPos, vertices, indices);
-        //             if(cost < bestCost)
-        //             {
-        //                 bestCost = cost;
-        //                 bestAxis = axis;
-        //                 bestSplitPos = splitPos;
-        //             }
-        //         }
-        //     }
-
-        //     if(bestCost >= parentCost)
-        //     {
-        //         return;
-        //     }
-        // }
-
-        //Prmitive
+        if(!FindBestSplitPosition(parentNode, allCentroids, vertices, indices, bestCost, bestAxis, bestSplitPos))
         {
-            bestAxis = 0;
-            if(aabbSize.y > aabbSize.x && aabbSize.y > aabbSize.z)
-            {
-                bestAxis = 1;
-            }
-            else if(aabbSize.z > aabbSize.x && aabbSize.z > aabbSize.y)
-            {
-                bestAxis = 2;
-            }
-
-            bestSplitPos = parentNode.aabbMin[bestAxis] + aabbSize[bestAxis] * 0.5f;
-
-            if(parentNode.indeciesCount <= 10)
-            {
-                return;
-            }
+            return;
         }
 
         int currentIndecie = parentNode.nextIndex;
         int lastIndecie = parentNode.nextIndex + parentNode.indeciesCount - 1;
         while (currentIndecie <= lastIndecie)
         {
-            glm::vec3 triCenter = 0.333333f * (
-                vertices[indices[currentIndecie]].Position + 
-                vertices[indices[currentIndecie + 1]].Position + 
-                vertices[indices[currentIndecie + 2]].Position);
+            glm::vec3 triCenter = allCentroids[currentIndecie / 3];
             if(triCenter[bestAxis] < bestSplitPos)
             {
                 currentIndecie+=3;
@@ -137,6 +86,7 @@ namespace TracerCore::AccelerationStructures
                 std::swap(indices[currentIndecie], indices[lastIndecie - 2]);
                 std::swap(indices[currentIndecie + 1], indices[lastIndecie - 1]);
                 std::swap(indices[currentIndecie + 2], indices[lastIndecie]);
+                std::swap(allCentroids[currentIndecie / 3], allCentroids[lastIndecie / 3]);
                 lastIndecie-=3;
             }
         }
@@ -163,14 +113,150 @@ namespace TracerCore::AccelerationStructures
         InsertNode(leftNode, vertices, indices);
         InsertNode(rightNode, vertices, indices);
 
-        SubdivideNode(leftNodeId, vertices, indices, depth + 1);
-        SubdivideNode(rightIndexId, vertices, indices, depth + 1);
+        SubdivideNode(leftNodeId, allCentroids, vertices, indices, depth + 1);
+        SubdivideNode(rightIndexId, allCentroids, vertices, indices, depth + 1);
     }
 
-    float BHVTree::CalculateSAH(uint32_t nodeIndex, int splitAxis, float splitPos, std::vector<TracerUtils::Models::TracerVertex> &vertices, std::vector<uint32_t> &indices)
+    bool BHVTree::FindBestSplitPosition(const BHVNode& node, std::vector<glm::vec3> allCentroids, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices, float& bestCost, uint32_t& bestSplitAxis, float& bestSplitPos)
     {
-        BHVNode& node = _nodes[nodeIndex];
+        // SAH Full
+        // {
+        //     float parentCost = CalculateSAHNodeCost(node);
 
+        //     for (uint32_t axis = 0; axis < 3; axis++)
+        //     {
+        //         for (uint32_t j = 0; j < node.indeciesCount; j+=3)
+        //         {
+        //             uint32_t currentIndecie = node.nextIndex + j;
+        //             glm::vec3 triCenter = allCentroids[currentIndecie / 3];
+
+        //             float splitPos = triCenter[axis];
+        //             float cost = CalculateSAH(node, axis, splitPos, bestCost, allCentroids, vertices, indices);
+        //             if(cost < bestCost)
+        //             {
+        //                 bestCost = cost;
+        //                 bestSplitAxis = axis;
+        //                 bestSplitPos = splitPos;
+        //             }
+        //         }
+        //     }
+
+        //     if(bestCost >= parentCost)
+        //     {
+        //         return false;
+        //     }
+        // }
+
+        // SAH Scaled aproximation
+        {
+            if(node.indeciesCount <= 9)
+            {
+                return false;
+            }
+
+            const uint32_t BINS = 8;
+            float parentCost = CalculateSAHNodeCost(node);
+
+            for (uint32_t axis = 0; axis < 3; axis++)
+            {
+                float boundsMin = node.aabbMin[axis];
+                float boundsMax = node.aabbMax[axis];
+                if((boundsMax - boundsMin) < 0.0001f)
+                    continue;
+
+                for (size_t i = 0; i < node.indeciesCount; i+=3)
+                {
+                    uint32_t currentIndecie = node.nextIndex + i;
+                    glm::vec3 triCenter = allCentroids[currentIndecie / 3];
+                    boundsMin = glm::min(boundsMin, triCenter[axis]);
+                    boundsMax = glm::max(boundsMax, triCenter[axis]);
+                }
+
+                BHVBin bins[BINS];
+                float scale = BINS / (boundsMax - boundsMin);
+                for (size_t i = 0; i < node.indeciesCount; i+=3)
+                {
+                    uint32_t currentIndecie = node.nextIndex + i;
+                    glm::vec3 v1 = vertices[indices[currentIndecie]].Position;
+                    glm::vec3 v2 = vertices[indices[currentIndecie + 1]].Position;
+                    glm::vec3 v3 = vertices[indices[currentIndecie + 2]].Position;
+                    glm::vec3 triCenter = allCentroids[currentIndecie / 3];
+
+                    int binIndex = __min(BINS - 1, (int) ((triCenter[axis] - boundsMin) * scale));
+                    bins[binIndex].aabb.Expand(v1);
+                    bins[binIndex].aabb.Expand(v2);
+                    bins[binIndex].aabb.Expand(v3);
+                    bins[binIndex].primitiveCount++;
+                }
+
+                float leftAreas[BINS - 1];
+                float rightAreas[BINS - 1];
+
+                int leftCount[BINS - 1];
+                int rightCount[BINS - 1];
+
+                AABB leftAABB;
+                uint32_t leftTriCount = 0;
+                AABB rightAABB;
+                uint32_t rightTriCount = 0;
+                for (size_t i = 0; i < (BINS - 1); i++)
+                {
+                    leftTriCount += bins[i].primitiveCount;
+                    leftCount[i] = leftTriCount;
+                    leftAABB.Expand(bins[i].aabb);
+                    leftAreas[i] = leftAABB.SurfaceArea();
+                    
+                    rightTriCount += bins[BINS - 1 - i].primitiveCount;
+                    rightCount[BINS - 2 - i] = rightTriCount;
+                    rightAABB.Expand(bins[BINS - 1 - i].aabb);
+                    rightAreas[BINS - 2 - i] = rightAABB.SurfaceArea();
+                }
+                
+                scale = (boundsMax - boundsMin) / BINS;
+                for (size_t i = 0; i < (BINS - 1); i++)
+                {
+                    float cost = leftAreas[i] * leftCount[i] + rightAreas[i] * rightCount[i];
+                    if(cost < bestCost)
+                    {
+                        bestCost = cost;
+                        bestSplitAxis = axis;
+                        bestSplitPos = boundsMin + scale * (i + 1);
+                    }
+                }
+            }
+
+            if(bestCost < 1.0f || bestCost >= parentCost)
+            {
+                return false;
+            }
+        }
+        
+        //Prmitive
+        // {
+        //     glm::vec3 aabbSize = node.aabbMax - node.aabbMin;
+        //     bestSplitAxis = 0;
+        //     if(aabbSize.y > aabbSize.x && aabbSize.y > aabbSize.z)
+        //     {
+        //         bestSplitAxis = 1;
+        //     }
+        //     else if(aabbSize.z > aabbSize.x && aabbSize.z > aabbSize.y)
+        //     {
+        //         bestSplitAxis = 2;
+        //     }
+
+        //     bestSplitPos = node.aabbMin[bestSplitAxis] + aabbSize[bestSplitAxis] * 0.5f;
+
+        //     if(node.indeciesCount <= 10)
+        //     {
+        //         return false;
+        //     }
+        // }
+
+        return true;
+    }
+
+    float BHVTree::CalculateSAH(const BHVNode& node, int splitAxis, float splitPos, float currentCost, std::vector<glm::vec3> allCentroids, std::vector<TracerUtils::Models::TracerVertex> &vertices, std::vector<uint32_t> &indices)
+    {
         AABB leftAABB;
         uint32_t leftCount = 0;
 
@@ -184,7 +270,7 @@ namespace TracerCore::AccelerationStructures
             glm::vec3 v2 = vertices[indices[currentIndecie + 1]].Position;
             glm::vec3 v3 = vertices[indices[currentIndecie + 2]].Position;
 
-            glm::vec3 triCenter = 0.333333f * (v1 + v2 + v3);
+            glm::vec3 triCenter = allCentroids[currentIndecie / 3];
 
             if(triCenter[splitAxis] < splitPos)
             {
@@ -200,9 +286,25 @@ namespace TracerCore::AccelerationStructures
                 rightAABB.Expand(v3);
                 rightCount++;
             }
+
+            if(i % 10000 == 0)
+            {
+                float cost = leftCount * leftAABB.SurfaceArea() + rightCount * rightAABB.SurfaceArea();
+                if(cost > currentCost)
+                {
+                     return FLT_MAX;
+                }
+            }
         }
         
         float cost = leftCount * leftAABB.SurfaceArea() + rightCount * rightAABB.SurfaceArea();
         return cost;
+    }
+
+    float BHVTree::CalculateSAHNodeCost(const BHVNode &node)
+    {
+        glm::vec3 aabbSize = node.aabbMax - node.aabbMin;
+        float parentSurfaceArea = 2.0f * (aabbSize.x * aabbSize.y + aabbSize.x * aabbSize.z + aabbSize.y * aabbSize.z);
+        return (node.indeciesCount / 3) * parentSurfaceArea;
     }
 }

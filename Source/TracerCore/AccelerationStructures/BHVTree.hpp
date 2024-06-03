@@ -22,6 +22,12 @@ namespace TracerCore::AccelerationStructures
         alignas(4) uint32_t indeciesCount;
     };
 
+    struct BHVBin
+    {
+        AABB aabb;
+        uint32_t primitiveCount = 0;
+    };
+
     class BHVTree : public AccelerationStructure 
     {
         public:
@@ -35,8 +41,13 @@ namespace TracerCore::AccelerationStructures
             inline virtual const Resources::VulkanBuffer* GetIndicesBuffer() const override { return _indeciesBuffer.get(); }
         private:
             void InsertNode(BHVNode& node, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices);
-            void SubdivideNode(uint32_t parentNodeIndex, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices, uint32_t depth);
-            float CalculateSAH(uint32_t nodeIndex, int splitAxis, float splitPos, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices);
+            void SubdivideNode(uint32_t parentNodeIndex, std::vector<glm::vec3> allCentroids, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices, uint32_t depth);
+
+            bool FindBestSplitPosition(const BHVNode& node, std::vector<glm::vec3> allCentroids, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices, float& bestCost, uint32_t& bestSplitAxis, float& bestSplitPos);
+            float CalculateSAH(const BHVNode& node, int splitAxis, float splitPos, float currentCost, std::vector<glm::vec3> allCentroids, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices);
+            float CalculateSAHNodeCost(const BHVNode& node);
+
+            
             
             std::unique_ptr<Resources::VulkanBuffer> _nodesBuffer;
             std::unique_ptr<Resources::VulkanBuffer> _indeciesBuffer;

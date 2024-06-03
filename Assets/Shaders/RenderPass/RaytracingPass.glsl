@@ -151,7 +151,7 @@ void main()
     vec3 origin = sceneData.camInvView[3].xyz;
 
     //anti aliasing
-    uint samplesPerPixel = 4;
+    uint samplesPerPixel = 1;
     float influence = 0.0025;
     vec3 frameColor = vec3(0);    
     for(int i = 0; i < samplesPerPixel; i++) {

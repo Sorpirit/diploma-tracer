@@ -57,7 +57,10 @@ namespace TracerUtils
 
         std::vector<const aiMesh*> meshes;
         VisitNode(scene->mRootNode, scene, &meshes);
-        ImportMesh(meshes[0], mesh);
+        for (size_t i = 0; i < meshes.size(); i++)
+        {
+            ImportMesh(meshes[i], mesh);
+        }
 
         importer.FreeScene();
         return mesh;
@@ -79,6 +82,8 @@ namespace TracerUtils
 
     void IOHelpers::ImportMesh(const aiMesh* mesh, Models::TracerMesh& tracerMesh)
     {
+        uint32_t indexOffset = tracerMesh.Vertices.size();
+
         for (size_t i = 0; i < mesh->mNumVertices; i++)
         {
             Models::TracerVertex vertex;
@@ -95,7 +100,7 @@ namespace TracerUtils
             auto face = mesh->mFaces[i];
             for (size_t j = 0; j < face.mNumIndices; j++)
             {
-                tracerMesh.Indices.push_back(face.mIndices[j]);
+                tracerMesh.Indices.push_back(indexOffset + face.mIndices[j]);
             }
         }
     }
