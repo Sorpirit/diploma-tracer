@@ -168,14 +168,14 @@ namespace TracerCore
     {
         //auto cube = TracerUtils::IOHelpers::LoadModel("Models\\cube.fbx");
         //auto cheken = TracerUtils::IOHelpers::LoadModel("Models\\Chicken_02.obj");
-        //auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\blneder_suzanne.fbx");
+        auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\blneder_suzanne.fbx");
         //auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\bunny.fbx");
         //auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\Cow.fbx");
-        auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\sportsCar.obj");
+        //auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\sportsCar.obj");
 
         _scene.AddModel(monkey);
         _scene.BuildScene();
-        _scene.SetAccMode(AccStructureType::AccStructure_BVH);
+        _scene.SetAccMode(AccStructureType::AccStructure_KdTree);
         std::cout << "Scene builded\n";
     }
 
@@ -325,8 +325,8 @@ namespace TracerCore
 
         _pipelineManager.CreatePipelineLayout(setLayout, &pipelineLayout);
 
-        //_pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\RaytraceKdTree.comp.spv", &computePipeline);
-        _pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\RaytraceBHVTree.comp.spv", &computePipeline);
+        _pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\RaytraceKdTree.comp.spv", &computePipeline);
+        //_pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\RaytraceBHVTree.comp.spv", &computePipeline);
 
         _shaderResourceManager.UploadTexture(descriptorSets, 0, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, _computeTexture.get());
         _shaderResourceManager.UploadTexture(descriptorSets, 1, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, _accumulationTexture.get());

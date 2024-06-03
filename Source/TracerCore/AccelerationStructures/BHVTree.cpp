@@ -254,53 +254,7 @@ namespace TracerCore::AccelerationStructures
 
         return true;
     }
-
-    float BHVTree::CalculateSAH(const BHVNode& node, int splitAxis, float splitPos, float currentCost, std::vector<glm::vec3> allCentroids, std::vector<TracerUtils::Models::TracerVertex> &vertices, std::vector<uint32_t> &indices)
-    {
-        AABB leftAABB;
-        uint32_t leftCount = 0;
-
-        AABB rightAABB;
-        uint32_t rightCount = 0;
-
-        for (size_t i = 0; i < node.indeciesCount; i+=3)
-        {
-            uint32_t currentIndecie = node.nextIndex + i;
-            glm::vec3 v1 = vertices[indices[currentIndecie]].Position;
-            glm::vec3 v2 = vertices[indices[currentIndecie + 1]].Position;
-            glm::vec3 v3 = vertices[indices[currentIndecie + 2]].Position;
-
-            glm::vec3 triCenter = allCentroids[currentIndecie / 3];
-
-            if(triCenter[splitAxis] < splitPos)
-            {
-                leftAABB.Expand(v1);
-                leftAABB.Expand(v2);
-                leftAABB.Expand(v3);
-                leftCount++;
-            }
-            else
-            {
-                rightAABB.Expand(v1);
-                rightAABB.Expand(v2);
-                rightAABB.Expand(v3);
-                rightCount++;
-            }
-
-            if(i % 10000 == 0)
-            {
-                float cost = leftCount * leftAABB.SurfaceArea() + rightCount * rightAABB.SurfaceArea();
-                if(cost > currentCost)
-                {
-                     return FLT_MAX;
-                }
-            }
-        }
-        
-        float cost = leftCount * leftAABB.SurfaceArea() + rightCount * rightAABB.SurfaceArea();
-        return cost;
-    }
-
+    
     float BHVTree::CalculateSAHNodeCost(const BHVNode &node)
     {
         glm::vec3 aabbSize = node.aabbMax - node.aabbMin;

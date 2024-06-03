@@ -38,8 +38,8 @@ namespace TracerCore
 
         _models.clear();
 
-        _accBHVStructure = std::make_unique<AccelerationStructures::BHVTree>(_device, vertecies, indices);
-        //_accKdTreeStructure = std::make_unique<AccelerationStructures::KdTree>(_device, vertecies, indices);
+        //_accBHVStructure = std::make_unique<AccelerationStructures::BHVTree>(_device, vertecies, indices);
+        _accKdTreeStructure = std::make_unique<AccelerationStructures::KdTree>(_device, vertecies, indices);
 
         //Upload scene data to GPU
         VkDeviceSize verteciesSize = sizeof(TracerUtils::Models::TracerVertex) * vertecies.size();

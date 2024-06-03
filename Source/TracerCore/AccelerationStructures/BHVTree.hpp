@@ -44,7 +44,6 @@ namespace TracerCore::AccelerationStructures
             void SubdivideNode(uint32_t parentNodeIndex, std::vector<glm::vec3> allCentroids, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices, uint32_t depth);
 
             bool FindBestSplitPosition(const BHVNode& node, std::vector<glm::vec3> allCentroids, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices, float& bestCost, uint32_t& bestSplitAxis, float& bestSplitPos);
-            float CalculateSAH(const BHVNode& node, int splitAxis, float splitPos, float currentCost, std::vector<glm::vec3> allCentroids, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices);
             float CalculateSAHNodeCost(const BHVNode& node);
 
             
