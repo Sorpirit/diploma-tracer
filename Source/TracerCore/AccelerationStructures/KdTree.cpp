@@ -1,4 +1,6 @@
 #include "KdTree.hpp"
+#include <algorithm>
+
 
 namespace TracerCore::AccelerationStructures
 {
@@ -20,7 +22,8 @@ namespace TracerCore::AccelerationStructures
             primitiveIndices.push_back(i / 3);
         }
 
-        _nodes.push_back({3, 0.5f, 0, 0, 0});
+        KdNode root = {0, 0.5f, 0, primitiveIndices.size()};
+        _nodes.push_back(root);
         BuildTree(0, _rootBounds, bounds, &primitiveIndices, 1);
 
         for (size_t i = 0; i < _indices.size(); i++)
@@ -39,6 +42,9 @@ namespace TracerCore::AccelerationStructures
         _indecieBuffer->MapMemory(sizeof(uint32_t) * _indices.size(), 0, &data);
         memcpy(data, _indices.data(), sizeof(uint32_t) * _indices.size());
         _indecieBuffer->UnmapMemory();
+
+        _indeciesCount = _indices.size();
+        _indices.clear();
     }
 
     KdTree::~KdTree()
@@ -52,11 +58,17 @@ namespace TracerCore::AccelerationStructures
         const std::vector<uint32_t>* primitiveIndices,
         uint32_t depth)
     {
-        if(primitiveIndices->size() <= 10 || depth > 32)
+        
+        uint32_t splitAxis = -1;
+        float splitPos = 0.0f;
+        float bestCost = FLT_MAX;
+        
+        bool foundSplit = FindBestSplitPosition(_nodes[nodeIndex], nodeBounds, allPrimitiveBounds, primitiveIndices, bestCost, splitAxis, splitPos);
+        if(depth > 64 || !foundSplit)
         {
             KdNode& leafNode = _nodes[nodeIndex];
             leafNode.flags = KdNodeFlags_Leaf;
-            leafNode.startIndex = _indices.size();
+            leafNode.nextIndex = _indices.size();
             leafNode.indeciesCount = primitiveIndices->size() * 3;
 
             for (size_t i = 0; i < primitiveIndices->size(); i++)
@@ -69,19 +81,6 @@ namespace TracerCore::AccelerationStructures
 
             return;
         }
-
-        glm::vec3 aabbSize = nodeBounds.aabbMax - nodeBounds.aabbMin;
-        uint32_t splitAxis = 0;
-        if(aabbSize.y > aabbSize.x && aabbSize.y > aabbSize.z)
-        {
-            splitAxis = 1;
-        }
-        else if(aabbSize.z > aabbSize.x && aabbSize.z > aabbSize.y)
-        {
-            splitAxis = 2;
-        }
-
-        float splitPos = nodeBounds.aabbMin[splitAxis] + aabbSize[splitAxis] * 0.5f;
 
         KdTreeBounds leftChildBounds = nodeBounds;
         KdTreeBounds rightChildBounds = nodeBounds;
@@ -114,7 +113,7 @@ namespace TracerCore::AccelerationStructures
         {
             KdNode& leafNode = _nodes[nodeIndex];
             leafNode.flags = KdNodeFlags_Leaf;
-            leafNode.startIndex = _indices.size();
+            leafNode.nextIndex = _indices.size();
             leafNode.indeciesCount = primitiveIndices->size() * 3;
 
             for (size_t i = 0; i < primitiveIndices->size(); i++)
@@ -134,15 +133,132 @@ namespace TracerCore::AccelerationStructures
         KdNode& rootNode = _nodes[nodeIndex];
         rootNode.flags = splitAxis;
         rootNode.split = splitPos;
-        rootNode.startIndex = 0;
+        rootNode.nextIndex = leftChildIndex;
         rootNode.indeciesCount = 0;
-        rootNode.left = leftChildIndex;
 
-        _nodes.push_back({3, splitPos, 0, 0, 0});
-        _nodes.push_back({3, splitPos, 0, 0, 0});
+        _nodes.push_back(KdNode{0, splitPos, 0, static_cast<uint32_t>(leftIndecies->size())});
+        _nodes.push_back(KdNode{0, splitPos, 0, static_cast<uint32_t>(rightIndecies->size())});
 
         BuildTree(leftChildIndex, leftChildBounds, allPrimitiveBounds, leftIndecies.get(), depth + 1);
+        if(depth == 1)
+        {
+            printf("Left child: %d\n", _nodes.size());
+        }
         BuildTree(rightChildIndex, rightChildBounds, allPrimitiveBounds, rightIndecies.get(), depth + 1);
+    }
+
+    bool KdTree::FindBestSplitPosition(
+        const KdNode &node, 
+        const KdTreeBounds &nodeBounds, 
+        const std::vector<KdTreeBounds> &allPrimitiveBounds, 
+        const std::vector<uint32_t> *primitiveIndices, 
+        float &bestCost, 
+        uint32_t &bestSplitAxis, 
+        float &bestSplitPos)
+    {
+        bestSplitAxis = 0;
+        bestCost = FLT_MAX;
+        bestSplitPos = 0.0f;
+
+        //SHA cost
+        {
+            if(node.indeciesCount <= 32)
+            {
+                return false;
+            }
+
+            glm::vec3 aabbSize = nodeBounds.aabbMax - nodeBounds.aabbMin;
+            float parentSurfaceArea = 2.0f * (aabbSize.x * aabbSize.y + aabbSize.x * aabbSize.z + aabbSize.y * aabbSize.z);
+            float invParentSurfaceArea = 1.0f / parentSurfaceArea;
+            float parentCost = node.indeciesCount * parentSurfaceArea;
+
+            for (uint32_t axis = 0; axis < 3; axis++)
+            {
+                float boundsMin = nodeBounds.aabbMin[axis];
+                float boundsMax = nodeBounds.aabbMax[axis];
+                if((boundsMax - boundsMin) < 0.0001f)
+                    continue;
+
+                uint32_t splitsCount = node.indeciesCount * 2; 
+                edgeVector.resize(splitsCount);
+                for (uint32_t i = 0; i < node.indeciesCount; i++)
+                {
+                    const KdTreeBounds& bounds = allPrimitiveBounds[(*primitiveIndices)[i]];
+                    edgeVector[i * 2] = {i, bounds.aabbMin[axis], false};
+                    edgeVector[i * 2 + 1] = {i, bounds.aabbMax[axis], true};
+                }
+
+                std::sort(edgeVector.begin(), edgeVector.end(), [](const KdSplit& a, const KdSplit& b) { return a.tSplit < b.tSplit; });
+
+                uint32_t primitiveLeftCount = 0;
+                uint32_t primitiveRight = node.indeciesCount;
+                for (uint32_t i = 0; i < splitsCount; i++)
+                {
+                    if(edgeVector[i].isMax)
+                    {
+                        primitiveRight--;
+                    }
+
+                    if(!edgeVector[i].isMax)
+                    {
+                        primitiveLeftCount++;
+                    }
+                    
+                    float splitPos = edgeVector[i].tSplit;
+                    if(splitPos <= boundsMin || splitPos >= boundsMax)
+                    {
+                        continue;
+                    }
+
+                    uint32_t axis1 = (axis + 1) % 3;
+                    uint32_t axis2 = (axis + 2) % 3;
+                    float leftArea = 2.0f * (aabbSize[axis1] * aabbSize[axis2] + (splitPos - boundsMin) * (aabbSize[axis1] + aabbSize[axis2]));
+                    float rightArea = 2.0f * (aabbSize[axis1] * aabbSize[axis2] + (boundsMax - splitPos) * (aabbSize[axis1] + aabbSize[axis2]));
+                    float cost = _traversalCost + leftArea * primitiveLeftCount + rightArea * primitiveRight;
+
+                    if(cost < bestCost)
+                    {
+                        bestCost = cost;
+                        bestSplitAxis = axis;
+                        bestSplitPos = splitPos;
+                    }
+                }
+            }
+
+            if(bestCost < 1.0f || bestCost >= parentCost)
+            {
+                return false;
+            }
+        }
+
+        //Primitive split
+        // {
+        //     if(node.indeciesCount <= 32)
+        //     {
+        //         return false;
+        //     }
+
+        //     glm::vec3 aabbSize = nodeBounds.aabbMax - nodeBounds.aabbMin;
+        //     if(aabbSize.y > aabbSize.x && aabbSize.y > aabbSize.z)
+        //     {
+        //         bestSplitAxis = 1;
+        //     }
+        //     else if(aabbSize.z > aabbSize.x && aabbSize.z > aabbSize.y)
+        //     {
+        //         bestSplitAxis = 2;
+        //     }
+
+        //     bestSplitPos = nodeBounds.aabbMin[bestSplitAxis] + aabbSize[bestSplitAxis] * 0.5f;
+        // }
+
+        return true;
+    }
+
+    float KdTree::CalculateSAHNodeCost(const KdNode &node, const KdTreeBounds &nodeBounds)
+    {
+        glm::vec3 aabbSize = nodeBounds.aabbMax - nodeBounds.aabbMin;
+        float parentSurfaceArea = 2.0f * (aabbSize.x * aabbSize.y + aabbSize.x * aabbSize.z + aabbSize.y * aabbSize.z);
+        return (node.indeciesCount) * parentSurfaceArea;
     }
 
 } // namespace TracerCore

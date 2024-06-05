@@ -49,10 +49,16 @@ void Scater(HitResult hit, inout ray ray, inout vec3 attenuation)
 
         //metal            
         case 1:
-            float fuzz = 0.01;
-            attenuation *= vec3(0.8, 0.8, 0.0); //albedo
+            float fuzz = 0.8;
+            attenuation *= vec3(0.83, 0.65, 0.92); //albedo
+            // ray.origin = hit.hitPoint + hit.normal * 0.01;
+            // ray.direction = normalize(reflect(ray.direction, hit.normal)) + fuzz * randomUnitVector();
+
+            //attenuation *= vec3(0.8, 0.8, 0.0); //albedo
             ray.origin = hit.hitPoint + hit.normal * 0.01;
-            ray.direction = normalize(reflect(ray.direction, hit.normal)) + fuzz * randomUnitVector();
+            ray.direction = hit.normal + randomUnitVector();
+            if(dot(ray.direction, hit.normal) < 0.0001) 
+                ray.direction = hit.normal;
             break;
 
         //glass

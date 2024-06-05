@@ -15,8 +15,12 @@ namespace TracerCore::AccelerationStructures {
         inline virtual const Resources::VulkanBuffer* GetNodesBuffer() const = 0;
         inline virtual const Resources::VulkanBuffer* GetIndicesBuffer() const = 0;
 
+        inline uint32_t GetIndeciesCount() const { return _indeciesCount; }
+
     protected:
         VulkanDevice& _device;
+
+        uint32_t _indeciesCount = 0;
     };
     
 

@@ -38,6 +38,7 @@ namespace TracerCore
         };
 
         inline GLFWwindow* GetWindow() { return _window; };
+        inline void CloseWindow() { glfwSetWindowShouldClose(_window, GLFW_TRUE); };
         
         void CreateWindowSurface(VkInstance instance, VkSurfaceKHR* surface);
     private:

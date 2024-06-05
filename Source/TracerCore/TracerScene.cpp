@@ -3,6 +3,8 @@
 #include "AccelerationStructures/BHVTree.hpp"
 #include "AccelerationStructures/KdTree.hpp"
 
+#include <tracy/Tracy.hpp>
+
 namespace TracerCore
 {
 
@@ -21,6 +23,7 @@ namespace TracerCore
 
     void TracerScene::BuildScene()
     {
+        ZoneScoped;
         std::vector<TracerUtils::Models::TracerVertex> vertecies;
         std::vector<uint32_t> indices;
 
@@ -38,8 +41,11 @@ namespace TracerCore
 
         _models.clear();
 
-        //_accBHVStructure = std::make_unique<AccelerationStructures::BHVTree>(_device, vertecies, indices);
-        _accKdTreeStructure = std::make_unique<AccelerationStructures::KdTree>(_device, vertecies, indices);
+        _accBHVStructure = std::make_unique<AccelerationStructures::BHVTree>(_device, vertecies, indices);
+        // auto kdTree = std::make_unique<AccelerationStructures::KdTree>(_device, vertecies, indices);
+        // _aabbMin = kdTree->GetAABBMin();
+        // _aabbMax = kdTree->GetAABBMax();
+        // _accKdTreeStructure = std::move(kdTree);
 
         //Upload scene data to GPU
         VkDeviceSize verteciesSize = sizeof(TracerUtils::Models::TracerVertex) * vertecies.size();

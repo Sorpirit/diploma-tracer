@@ -37,6 +37,7 @@ namespace TracerCore
     
         inline const glm::vec3& GetAABBMin() const { return _aabbMin; }
         inline const glm::vec3& GetAABBMax() const { return _aabbMax; }
+        inline const uint32_t GetIndeciesCount() const { return _accStructure == nullptr ? 0 : _accStructure->GetIndeciesCount(); }
     
         void AttachSceneGeometry(const ShaderReosuceManager& resourceManager, std::vector<VkDescriptorSet>& descriptosSets) const;
 

@@ -34,6 +34,8 @@ namespace TracerCore::AccelerationStructures
         _indeciesBuffer->MapMemory(sizeof(uint32_t) * indicesCopy.size(), 0, &data);
         memcpy(data, indicesCopy.data(), sizeof(uint32_t) * indicesCopy.size());
         _indeciesBuffer->UnmapMemory();
+
+        _indeciesCount = indicesCopy.size();
     }
 
     BHVTree::~BHVTree()
@@ -59,7 +61,7 @@ namespace TracerCore::AccelerationStructures
 
     void BHVTree::SubdivideNode(uint32_t parentNodeIndex, std::vector<glm::vec3> allCentroids, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices, uint32_t depth)
     {
-        if(depth > 64)
+        if(depth > 32)
             return;
 
         BHVNode& parentNode = _nodes[parentNodeIndex];
@@ -149,7 +151,7 @@ namespace TracerCore::AccelerationStructures
 
         // SAH Scaled aproximation
         {
-            if(node.indeciesCount <= 9)
+            if(node.indeciesCount <= 32)
             {
                 return false;
             }
@@ -233,6 +235,11 @@ namespace TracerCore::AccelerationStructures
         
         //Prmitive
         // {
+        //     if(node.indeciesCount <= 32)
+        //     {
+        //         return false;
+        //     }
+
         //     glm::vec3 aabbSize = node.aabbMax - node.aabbMin;
         //     bestSplitAxis = 0;
         //     if(aabbSize.y > aabbSize.x && aabbSize.y > aabbSize.z)
@@ -245,16 +252,11 @@ namespace TracerCore::AccelerationStructures
         //     }
 
         //     bestSplitPos = node.aabbMin[bestSplitAxis] + aabbSize[bestSplitAxis] * 0.5f;
-
-        //     if(node.indeciesCount <= 10)
-        //     {
-        //         return false;
-        //     }
         // }
 
         return true;
     }
-    
+
     float BHVTree::CalculateSAHNodeCost(const BHVNode &node)
     {
         glm::vec3 aabbSize = node.aabbMax - node.aabbMin;

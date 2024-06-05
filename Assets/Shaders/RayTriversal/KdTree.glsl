@@ -10,10 +10,16 @@
 struct KdNode {
     uint flags;
     float split;
-    uint left;
-    // uint32_t right = left + 1; as they are stored consequtevly
-    uint startIndex;
+    // if indeciesCount > 0 then this is a leaf node so nextIndex means offset in the indecies buffer. If indeciesCount == 0 then this is a branch node so nextIndex means offset in the nodes buffer
+    uint nextIndex;
     uint indeciesCount;
+};
+
+struct KdNodeProcess
+{
+    uint nodeIndex;
+    float tStart;
+    float tEnd;
 };
 
 layout(binding = 5) readonly buffer KdNodes{
@@ -22,29 +28,38 @@ layout(binding = 5) readonly buffer KdNodes{
 
 bool hitKdTree(uint nodeIndex, ray ray, float tMin, inout float tMax, inout HitResult hitResult) 
 {
-    uint nodeQueue[32];
-    nodeQueue[0] = nodeIndex;
-    uint quelenght = 1;
-
     float tStart = tMin;
     float tEnd = tMax;
 
     AABB rootAABB = AABB(sceneData.aabbMin, sceneData.aabbMax);
-    if(!hitAABB(rootAABB, ray, tStart, tEnd) || tStart > tMax) 
+    if(!hitAABB(rootAABB, ray, tStart, tEnd)) 
         return false;
+
+    if(tStart > tMax)
+        return false;
+
+    KdNodeProcess nodeQueue[64];
+    nodeQueue[0] = KdNodeProcess(nodeIndex, tStart, tEnd);
+    uint quelenght = 1;
 
     bool hit = false;
     HitResult currentHit;
 
     while(quelenght > 0)
     {
-        KdNode node = nodes[nodeQueue[quelenght - 1]];
+        KdNodeProcess currentProcess = nodeQueue[quelenght - 1];
+        KdNode node = nodes[currentProcess.nodeIndex];
+        tStart = currentProcess.tStart;
+        tEnd = currentProcess.tEnd;
         quelenght--;
+
+        if(tStart > tMax)
+            break;
 
         if (node.indeciesCount > 0) {
             for(int i = 0; i < node.indeciesCount; i+= 3)
             {
-                triangle tri = getTriangle(node.startIndex + i);
+                triangle tri = getTriangle(node.nextIndex + i);
                 if (hitTriangle(tri, ray, tMin, tMax, currentHit))
                 {
                     hit = true;
@@ -52,33 +67,29 @@ bool hitKdTree(uint nodeIndex, ray ray, float tMin, inout float tMax, inout HitR
                 }
             }
 
-            //early exit
-            if(hit)
-                return true;
-
             continue;
         }
 
         
-        float t = (node.split - ray.origin[node.flags]) / ray.direction[node.flags];
+        float t = (node.split - ray.origin[node.flags]) * ray.invDirection[node.flags];
         
         bool leftToRightOrder = (ray.origin[node.flags] < node.split) || (ray.origin[node.flags] == node.split && ray.direction[node.flags] <= 0);
         
-        uint nearChild = leftToRightOrder ? node.left : node.left + 1;
-        uint farChild = leftToRightOrder ? node.left + 1 : node.left;
+        uint nearChild = leftToRightOrder ? node.nextIndex : node.nextIndex + 1;
+        uint farChild = leftToRightOrder ? node.nextIndex + 1 : node.nextIndex;
 
         if(t > tEnd || t <= 0)
         {
-            nodeQueue[quelenght++] = nearChild;
+            nodeQueue[quelenght++] = KdNodeProcess(nearChild, tStart, tEnd);
         }
         else if(t < tStart)
         {
-            nodeQueue[quelenght++] = farChild;
+            nodeQueue[quelenght++] = KdNodeProcess(farChild, tStart, tEnd);
         }
         else
         {
-            nodeQueue[quelenght++] = farChild;
-            nodeQueue[quelenght++] = nearChild;
+            nodeQueue[quelenght++] = KdNodeProcess(farChild, t, tEnd);
+            nodeQueue[quelenght++] = KdNodeProcess(nearChild, tStart, t);
         }
     }
 

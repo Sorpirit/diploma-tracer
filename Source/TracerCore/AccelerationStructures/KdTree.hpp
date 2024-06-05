@@ -45,11 +45,16 @@ namespace TracerCore::AccelerationStructures
         alignas(4) uint32_t flags;
         alignas(4) float split;
         
-        alignas(4) uint32_t left;
-        // uint32_t right = left + 1; as they are stored consequtevly
-
-        alignas(4) uint32_t startIndex;
+        // if indeciesCount > 0 then this is a leaf node so nextIndex means offset in the indecies buffer. If indeciesCount == 0 then this is a branch node so nextIndex means offset in the nodes buffer
+        alignas(4) uint32_t nextIndex;
         alignas(4) uint32_t indeciesCount;
+    };
+
+    struct KdSplit
+    {
+        uint32_t primIndex;
+        float tSplit;
+        bool isMax;
     };
 
     class KdTree : public AccelerationStructure
@@ -76,12 +81,26 @@ namespace TracerCore::AccelerationStructures
             uint32_t depth
         );
 
+        bool FindBestSplitPosition(
+            const KdNode &node, 
+            const KdTreeBounds &nodeBounds,
+            const std::vector<KdTreeBounds> &allPrimitiveBounds, 
+            const std::vector<uint32_t>* primitiveIndices,
+            float &bestCost, 
+            uint32_t &bestSplitAxis, 
+            float &bestSplitPos
+        );
+        float CalculateSAHNodeCost(const KdNode &node, const KdTreeBounds &nodeBounds);
+
         std::unique_ptr<Resources::VulkanBuffer> _nodesBuffer;
         std::unique_ptr<Resources::VulkanBuffer> _indecieBuffer;
 
         KdTreeBounds _rootBounds;
         std::vector<KdNode> _nodes;
         std::vector<uint32_t> _indices;
+
+        float _traversalCost = 1.0f;
+        std::vector<KdSplit> edgeVector;
     };
     
 } // namespace TracerCore
