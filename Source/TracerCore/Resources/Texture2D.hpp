@@ -31,6 +31,7 @@ namespace Resources
             bool optimalTiling,
             VulkanDevice& device);
         static std::unique_ptr<Texture2D> LoadFileTexture(const std::string& filePath, VulkanDevice& device);
+        static void SaveTextureToFile(const std::string& filePath, Texture2D* texture, VulkanDevice& device);
         static void CreateImageWithInfo(VulkanDevice &device, const VkImageCreateInfo &imageInfo, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &imageMemory);
         
         inline VkImage GetImage() const { return _image; }

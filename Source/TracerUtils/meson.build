@@ -1,4 +1,4 @@
-tracer_utils_src = files(['TracerIO.cpp', 'Models\\TracerMesh.cpp' ])
+tracer_utils_src = files(['TracerIO.cpp' ])
 tracer_utils_include = include_directories('.')
 
 stb_lib_dir = '..\\..\\Libraries\\stb'

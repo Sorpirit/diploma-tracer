@@ -5,6 +5,7 @@
 #include <vector>
 #include <filesystem>
 #include <stb_image.h>
+#include <stb_image_write.h>
 
 #include "Models/TracerMesh.hpp"
 #include "Models/TracerVertex.hpp"
@@ -22,6 +23,7 @@ namespace TracerUtils
         static std::unique_ptr<std::vector<char>> ReadFile(const std::string& filePath);
         
         static stbi_uc* LoadImage(const std::string& filePath, int* width, int* height, int* channels, bool useAlphaChannel);
+        static void SaveImage(const std::string& filePath, stbi_uc* image, int width, int height, int channels);
         static void FreeImage(stbi_uc* image);
         static Models::TracerMesh LoadModel(const std::string& filePath);
 

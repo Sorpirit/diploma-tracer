@@ -17,7 +17,7 @@ namespace TracerCore
             VkDescriptorPool descriptorPool,
             std::vector<VkDescriptorSet> descriptorSets,
             VkPipelineLayout pipelineLayout,
-            VkPipeline computePipeline
+            std::vector<VkPipeline> pipelines
         );
         ~PipelineObject();
 
@@ -27,7 +27,7 @@ namespace TracerCore
         void Bind(VkCommandBuffer commandBuffer, int imageIndex);
         
         inline const std::vector<VkDescriptorSet>& GetDescriptorSets() const { return _descriptorSets; }
-
+        inline void SetPipelineVariantIndex(uint32_t index) { _pipelineVariantIndex = index; }
     private:
         VulkanDevice& _device;
 
@@ -37,6 +37,8 @@ namespace TracerCore
         VkDescriptorSetLayout _setLayout;
         std::vector<VkDescriptorSet> _descriptorSets;
         VkPipelineLayout _pipelineLayout;
-        VkPipeline _pipeline;
+        std::vector<VkPipeline> _pipelineVariants;
+
+        uint32_t _pipelineVariantIndex = 0;
     };
 }

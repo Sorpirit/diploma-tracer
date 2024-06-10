@@ -3,8 +3,8 @@ tracer_core_src = files([
     'VulkanDevice.cpp', 
     'Window.cpp', 
     'SwapChain.cpp', 
-    'Tracer.cpp', 
     'PipelineObject.cpp', 
+    'Tracer.cpp', 
     'TracerScene.cpp',
     'Model.cpp', 
     'Raytracer.cpp', 
@@ -17,6 +17,8 @@ tracer_core_src = files([
     'UI/UILayer.cpp',
     'UI/CamerUIControl.cpp',
     'UI/StatisicUILayer.cpp',
+    'UI/WindowsFileDialog.cpp',
+    'UI/FrameControllsUI.cpp',
     'TracerCamera.cpp',
     'AccelerationStructures/BHVTree.cpp',
     'AccelerationStructures/KdTree.cpp'

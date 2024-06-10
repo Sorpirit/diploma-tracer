@@ -5,6 +5,7 @@
 #include <Models/TracerVertex.hpp>
 #include <Resources/VulkanBuffer.hpp>
 #include <Math/AABB.hpp>
+#include "../TracerScene.hpp"
 
 #include <glm/glm.hpp>
 #include <vector>
@@ -31,7 +32,7 @@ namespace TracerCore::AccelerationStructures
     class BHVTree : public AccelerationStructure 
     {
         public:
-            BHVTree(VulkanDevice& _device, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices);
+            BHVTree(VulkanDevice& _device, AccHeruishitcType accHeruishitcType, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices);
             ~BHVTree() override;
 
             BHVTree(const BHVTree&) = delete;
@@ -46,7 +47,7 @@ namespace TracerCore::AccelerationStructures
             bool FindBestSplitPosition(const BHVNode& node, std::vector<glm::vec3> allCentroids, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices, float& bestCost, uint32_t& bestSplitAxis, float& bestSplitPos);
             float CalculateSAHNodeCost(const BHVNode& node);
 
-            
+            const AccHeruishitcType _accHeruishitcType;
             
             std::unique_ptr<Resources::VulkanBuffer> _nodesBuffer;
             std::unique_ptr<Resources::VulkanBuffer> _indeciesBuffer;

@@ -11,6 +11,10 @@ layout(binding = 2, std140) uniform SceneData{
     uint useAccumulationTexture;
     uint accumFrameIndex;
     uint maxBounces;
+    
+    float defoucsDiskAngle;
+    float defoucsDiskU;
+    float defoucsDiskV;
 
     vec3 aabbMin;
     vec3 aabbMax;

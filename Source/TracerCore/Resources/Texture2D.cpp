@@ -3,6 +3,7 @@
 
 #include "TracerIO.hpp"
 #include "VulkanBuffer.hpp"
+#include "../../TracerUtils/TracerIO.hpp"
 
 #include <assert.h>
 
@@ -58,6 +59,18 @@ namespace Resources
         textureImage->TransitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         return std::move(textureImage);
+    }
+
+    void Texture2D::SaveTextureToFile(const std::string &filePath, Texture2D *texture, VulkanDevice &device)
+    {
+        VkDeviceSize imageSize = texture->GetWidth() * texture->GetHeight() * 4;
+        std::unique_ptr<VulkanBuffer> stagingBuffer = VulkanBuffer::CreateBuffer(device, imageSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        texture->CopyToBuffer(stagingBuffer.get());
+
+        void* data;
+        stagingBuffer->MapMemory(texture->GetWidth() * texture->GetHeight() * 4, 0, &data);
+        TracerUtils::IOHelpers::SaveImage(filePath, static_cast<stbi_uc*>(data), texture->GetWidth(), texture->GetHeight(), 4);
+        stagingBuffer->UnmapMemory();
     }
 
     std::unique_ptr<Texture2D> Texture2D::CreateTexture2D(

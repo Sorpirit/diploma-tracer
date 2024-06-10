@@ -19,6 +19,26 @@ namespace TracerCore
         AccStructure_KdTree
     };
 
+    enum class AccHeruishitcType
+    {
+        AccHeruishitc_Primitive,
+        AccHeruishitc_SAH
+    };
+
+    struct Material
+    {
+        alignas(16) glm::vec3 albedo;
+        alignas(4) float fuzz;
+    };
+
+    struct MaterialsSettings
+    {
+        glm::vec3 groundAlbedo = glm::vec3(0.5f);
+        bool UseRandomMaterials = true;
+        glm::vec3 meshAlbedo = glm::vec3(0.5f);
+        float meshFuzz = 0.0f;
+    };
+
     class TracerScene
     {
     public:
@@ -29,7 +49,8 @@ namespace TracerCore
         TracerScene &operator=(const TracerScene&) = delete;
 
         void AddModel(TracerUtils::Models::TracerMesh& model);
-        void BuildScene();
+        void BuildMaterials(const MaterialsSettings& materialsSettings);
+        void BuildScene(AccStructureType accType, AccHeruishitcType accHeruishitcType);
 
         inline const AccelerationStructures::AccelerationStructure& GetAccelerationStructure() const { return *_accStructure; }
         inline const Resources::VulkanBuffer* GetVertexBuffer() const { return _vertexBuffer.get(); }
@@ -39,35 +60,20 @@ namespace TracerCore
         inline const glm::vec3& GetAABBMax() const { return _aabbMax; }
         inline const uint32_t GetIndeciesCount() const { return _accStructure == nullptr ? 0 : _accStructure->GetIndeciesCount(); }
     
-        void AttachSceneGeometry(const ShaderReosuceManager& resourceManager, std::vector<VkDescriptorSet>& descriptosSets) const;
-
-        inline void SetAccMode(AccStructureType accType) {
-            switch (accType)
-            {
-            case AccStructureType::AccStructure_BVH:
-                _accStructure = _accBHVStructure.get();
-                break;
-            case AccStructureType::AccStructure_KdTree:
-                _accStructure = _accKdTreeStructure.get();
-                break;
-            default:
-                _accStructure = nullptr;
-                break;
-            }
-        } 
+        void AttachSceneGeometry(const ShaderReosuceManager& resourceManager, const std::vector<VkDescriptorSet>& descriptosSets) const;
 
     private:
         
         VulkanDevice& _device;
 
         std::vector<TracerUtils::Models::TracerMesh*> _models;
+        std::vector<Material> _materials;
+
         std::unique_ptr<Resources::VulkanBuffer> _vertexBuffer;
         std::unique_ptr<Resources::VulkanBuffer> _indexBuffer;
+        std::unique_ptr<Resources::VulkanBuffer> _materialsBuffer;
 
-        AccelerationStructures::AccelerationStructure* _accStructure;
-
-        std::unique_ptr<AccelerationStructures::AccelerationStructure> _accBHVStructure;
-        std::unique_ptr<AccelerationStructures::AccelerationStructure> _accKdTreeStructure;
+        std::unique_ptr<AccelerationStructures::AccelerationStructure> _accStructure;
 
         glm::vec3 _aabbMin = glm::vec3(FLT_MAX);
         glm::vec3 _aabbMax = glm::vec3(-FLT_MAX);

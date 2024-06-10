@@ -40,7 +40,7 @@
 		{
 			"label": "Wipe Setup",
 			"type": "shell",
-			"command": "meson setup --wipe -D tracy_enable=true --backend vs Build",
+			"command": "meson setup --wipe --buildtype=release -D tracy_enable=true --backend vs Build",
 			"problemMatcher": [
 				"$meson-gcc"
 			],

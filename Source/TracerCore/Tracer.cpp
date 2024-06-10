@@ -7,7 +7,9 @@
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
+#include <glm/gtx/compatibility.hpp>
 
 #include <tracy/Tracy.hpp>
 
@@ -16,73 +18,84 @@
 #include "Models/TracerVertex.hpp"
 
 
+
 namespace TracerCore
 {
-    std::vector<TracerUtils::Models::TrianglePolygon> Cube()
-    {
-        std::vector<TracerUtils::Models::TrianglePolygon> triangles(12);
-        auto v0 = glm::vec3(1.0f, -1.0f, -1.0f);
-        auto v1 = glm::vec3(1.0f, -1.0f, 1.0f);
-        auto v2 = glm::vec3(-1.0f, -1.0f, 1.0f);
-        auto v3 = glm::vec3(-1.0f, -1.0f, -1.0f);
-        auto v4 = glm::vec3(1.0f, 1.0f, -1.0f);
-        auto v5 = glm::vec3(1.0f, 1.0f, 1.0f);
-        auto v6 = glm::vec3(-1.0f, 1.0f, 1.0f);
-        auto v7 = glm::vec3(-1.0f, 1.0f, -1.0f);
-        triangles[0] = {v1, v2, v3};
-        triangles[1] = {v7, v6, v5};
-        triangles[2] = {v0, v4, v5};
-        triangles[3] = {v1, v5, v6};
-        triangles[4] = {v6, v7, v3};
-        triangles[5] = {v0, v3, v7};
-        triangles[6] = {v0, v1, v3};
-        triangles[7] = {v4, v7, v5};
-        triangles[8] = {v1, v0, v5};
-        triangles[9] = {v2, v1, v6};
-        triangles[10] = {v2, v6, v3};
-        triangles[11] = {v4, v0, v7};
-        return triangles;
-    }
+    //test animation
+    static const bool AnimatedCamera = false;
+    static const glm::vec3 cameraPositions[] = {
+        glm::vec3(3, .4, .4),
+        glm::vec3(0, .7, -4.0),
+        glm::vec3(0, 3, 0),
+        glm::vec3(-2.4f, 0.7f, 3.5f),
+        glm::vec3(0, 0.5f, 4.0f),
+    };
+    static const float timePreTransition = 8.0f;
+    static int currentCameraPosition = 0;
+    static float timeTransition = 0.0f;
     
+
+    static void AnimateCamera(TracerCamera& camera, float deltaTime, uint32_t frameCount)
+    {
+        glm::vec3 position = glm::lerp(cameraPositions[currentCameraPosition], cameraPositions[(currentCameraPosition + 1) % 5], timeTransition / timePreTransition);
+        if(frameCount > 10)
+        {
+            if(timeTransition < timePreTransition)
+            {
+                timeTransition += deltaTime;
+            }
+            else
+            {
+                timeTransition = 0.0f;
+                currentCameraPosition = (currentCameraPosition + 1) % 5;
+            }
+
+            camera.SetParameters(position, glm::normalize(glm::vec3(0, .5, 0) - position));
+            camera.SetStatic(false);
+        }
+    }
+
     Tracer::Tracer()
     {
         ZoneScoped;
-        RecreateSwapChain();
-        LoadModels();
-        LoadImages();
 
         auto extent = _mainWindow.GetExtent();
-        glm::vec3 position = glm::vec3(2, 0, .4);
+        glm::vec3 position = cameraPositions[0];
         glm::vec3 target = glm::vec3(0, .5, 0);
         _camera.SetParameters(position, glm::normalize(target - position));
         _camera.SetProjection(glm::radians(95.0f), extent.width / (float) extent.height, 0.1f, 150.0f);
 
-        _frameData.Color = glm::vec3(0.5, 0.7, 1.0);
+        _sceneData.ModelPath = "Models\\suzanne.fbx";
+        _sceneData.AccStructureType = AccStructureType::AccStructure_BVH;
+        _sceneData.AccHeruishitcType = AccHeruishitcType::AccHeruishitc_SAH;
+
+        _frameStats.color = glm::vec3(0.5, 0.7, 1.0);
+        _frameStats.bounceCount = 16;
+
+        _frameData.Color = _frameStats.color;
         _frameData.FrameIndex = 1;
         _frameData.Projection = _camera.GetProjection();
         _frameData.InvProjection = _camera.GetInvProjection();
         _frameData.View = _camera.GetView();
         _frameData.InvView = _camera.GetInvView();
-        _frameData.BounceCount = 4;
+        _frameData.BounceCount = _frameStats.bounceCount;
 
-        //kd tree
-        _frameData.aabbMin = _scene.GetAABBMin();
-        _frameData.aabbMax = _scene.GetAABBMax();
+        _materialsSettings.groundAlbedo = glm::vec3(0.8f, 0.8f, 0.0f);
+        _materialsSettings.UseRandomMaterials = true;
+        _materialsSettings.meshAlbedo = glm::vec3(0.83f, 0.65f, 0.92f);
+        _materialsSettings.meshFuzz = 0.4f;
 
-        _frameStats.color = _frameData.Color;
-        _frameStats.models[0] = "Cube";
-        _frameStats.models[1] = "Chiken";
-        _frameStats.models[2] = "Croissant";
-        _frameStats.moderlsCount = 3;
-        _frameStats.bounceCount = 4;
-        _frameStats.renderModel = 0;
+
+        LoadImages();
+        RecreateSwapChain();
 
         CreateBuffers();
         CreateOnScreenPipelines();
         CreateComputePipelines();
-
+        SwitchRaytracePipeline();
+        LoadModels();
+        
         CreateCommandBuffers();
-        _raytracer.LoadRaytracer(_device);
     }
 
     Tracer::~Tracer()
@@ -108,9 +121,8 @@ namespace TracerCore
 
         uint32_t accumStartFrameIndex = 0;
 
-        int selectedModel = 0;
-
         while(_mainWindow.ShouldClose()) {
+            
             currentFrame = glfwGetTime();
             deltaTime = currentFrame - lastFrame;
             lastFrame = currentFrame;
@@ -125,10 +137,13 @@ namespace TracerCore
 
             _frameStats.FrameTime = deltaTime;
 
-            glfwPollEvents();
+            if(AnimatedCamera)
+            {
+                AnimateCamera(_camera, deltaTime, frameCount);
+            }
 
             //update frame params
-            _frameData.Color = glm::vec3(1, 0, 0.0f);
+            _frameData.Color = _frameStats.color;
             _frameData.Projection = _camera.GetProjection();
             _frameData.InvProjection = _camera.GetInvProjection();
             _frameData.View = _camera.GetView();
@@ -142,21 +157,28 @@ namespace TracerCore
 
             _frameData.UseAccumTexture = _camera.IsStatic();
             _frameData.AccumFrameIndex = frameCount - accumStartFrameIndex;
-
-            _frameData.Color = _frameStats.color;
-
-            if(_frameStats.renderModel != selectedModel)
-            {
-                //TODO change model
-            }
-
             _frameData.BounceCount = _frameStats.bounceCount;
 
             VkDeviceSize size = sizeof(FrameData);
             memcpy(_frameDataPtr, &_frameData, size);
             
-
+            glfwPollEvents();
             DrawFrame();
+
+            if(!_sceneData.IsSceneLoaded)
+            {
+                SwitchRaytracePipeline();
+                LoadModels();
+            }
+
+            if(_sceneData.ResetCamera)
+            {
+                glm::vec3 position = cameraPositions[0];
+                glm::vec3 target = glm::vec3(0, .5, 0);
+                _camera.SetParameters(position, glm::normalize(target - position));
+                _sceneData.ResetCamera = false;
+            }
+
             frameCount++;
             FrameMark;
         }
@@ -166,22 +188,23 @@ namespace TracerCore
 
     void Tracer::LoadModels()
     {
-        //auto cube = TracerUtils::IOHelpers::LoadModel("Models\\cube.fbx");
-        //auto cheken = TracerUtils::IOHelpers::LoadModel("Models\\Chicken_02.obj");
-        auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\blneder_suzanne.fbx");
-        //auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\bunny.fbx");
-        //auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\Cow.fbx");
-        //auto monkey = TracerUtils::IOHelpers::LoadModel("Models\\sportsCar.obj");
+        auto model = TracerUtils::IOHelpers::LoadModel(_sceneData.ModelPath);
+        _scene.AddModel(model);
+        _scene.BuildMaterials(_materialsSettings);
+        _scene.BuildScene(_sceneData.AccStructureType, _sceneData.AccHeruishitcType);
+        std::cout << "Scene builded. " << _sceneData.ModelPath << " loaded. Acc structure:" << (int) _sceneData.AccStructureType << " Acc heuristic:" << (int) _sceneData.AccHeruishitcType << "\n";
 
-        _scene.AddModel(monkey);
-        _scene.BuildScene();
-        _scene.SetAccMode(AccStructureType::AccStructure_KdTree);
-        std::cout << "Scene builded\n";
+        _frameStats.TriCount = _scene.GetIndeciesCount() / 3;
+        _frameData.aabbMin = _scene.GetAABBMin();
+        _frameData.aabbMax = _scene.GetAABBMax();
+        _sceneData.IsSceneLoaded = true;
+
+        _scene.AttachSceneGeometry(_shaderResourceManager, _rayTracingPipeline->GetDescriptorSets());
     }
 
     void Tracer::LoadImages()
     {
-        _texture2d = Resources::Texture2D::LoadFileTexture("Textures\\cutecat.jpg", _device);
+        // _texture2d = Resources::Texture2D::LoadFileTexture("Textures\\cutecat.jpg", _device);
 
         auto extent = _mainWindow.GetExtent();
         _computeTexture = Resources::Texture2D::CreateTexture2D(extent.width, extent.height, 
@@ -200,6 +223,25 @@ namespace TracerCore
             _device
         );
         _accumulationTexture->TransitionImageLayout(VK_IMAGE_LAYOUT_GENERAL);
+    }
+
+    void Tracer::SwitchRaytracePipeline()
+    {
+        switch (_sceneData.AccStructureType)
+        {
+        case AccStructureType::AccStructure_BVH:   
+            _rayTracingPipeline->SetPipelineVariantIndex(0);
+            break;
+        case AccStructureType::AccStructure_KdTree:
+            _rayTracingPipeline->SetPipelineVariantIndex(1);
+            break;
+        case AccStructureType::AccStructure_None:
+            _rayTracingPipeline->SetPipelineVariantIndex(2);
+            break;
+        
+        default:
+            break;
+        }
     }
 
     void Tracer::CreateBuffers()
@@ -251,6 +293,8 @@ namespace TracerCore
 
         _shaderResourceManager.UploadTexture(descriptorSets, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, _computeTexture.get());
 
+        std::vector<VkPipeline> variants = std::vector<VkPipeline>{onScreenPipeline};
+
         _graphicsPipeline = std::make_unique<PipelineObject>(
             _device,
             VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -258,7 +302,7 @@ namespace TracerCore
             descriptorPool, 
             std::move(descriptorSets),
             pipelineLayout,
-            onScreenPipeline
+            std::move(variants)
         );
     }
 
@@ -273,15 +317,14 @@ namespace TracerCore
         VkDescriptorSetLayout setLayout;
         std::vector<VkDescriptorSet> descriptorSets;
         VkPipelineLayout pipelineLayout;
-        VkPipeline computePipeline;
 
         VkDescriptorPoolSize poolSizes[] = {
             {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, imageCount * 2},
             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, imageCount},
-            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, imageCount * 3},
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, imageCount * 4},
         };
 
-        const int bindingCount = 6;
+        const int bindingCount = 7;
         VkDescriptorSetLayoutBinding layoutBindings[bindingCount];
         layoutBindings[0].binding = 0;
         layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -319,29 +362,40 @@ namespace TracerCore
         layoutBindings[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
         layoutBindings[5].pImmutableSamplers = nullptr;
 
+        layoutBindings[6].binding = 6;
+        layoutBindings[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        layoutBindings[6].descriptorCount = 1;
+        layoutBindings[6].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        layoutBindings[6].pImmutableSamplers = nullptr;
+
         _shaderResourceManager.CreateDescriptorPool(poolSizes, 1, imageCount, descriptorPool);
         _shaderResourceManager.CreateDescriptorSetLayout(layoutBindings, bindingCount, setLayout);
         _shaderResourceManager.CreateDescriptorSets(descriptorPool, setLayout, imageCount, descriptorSets);
 
         _pipelineManager.CreatePipelineLayout(setLayout, &pipelineLayout);
 
-        _pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\RaytraceKdTree.comp.spv", &computePipeline);
-        //_pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\RaytraceBHVTree.comp.spv", &computePipeline);
+        VkPipeline bhvPipeline;
+        VkPipeline kdPipeline;
+        VkPipeline simpleLoopPipeline;
+    
+        _pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\RaytraceKdTree.comp.spv", &kdPipeline);
+        _pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\RaytraceBHVTree.comp.spv", &bhvPipeline);
+        _pipelineManager.CreateComputePipeline(pipelineLayout, "PrecompiledShaders\\RaytraceSimpleLoop.comp.spv", &simpleLoopPipeline);
 
         _shaderResourceManager.UploadTexture(descriptorSets, 0, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, _computeTexture.get());
         _shaderResourceManager.UploadTexture(descriptorSets, 1, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, _accumulationTexture.get());
         _shaderResourceManager.UploadBuffer(descriptorSets, 2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, _framedataBuffer.get());
-        
-        _scene.AttachSceneGeometry(_shaderResourceManager, descriptorSets);
 
-        _computePipeline = std::make_unique<PipelineObject>(
+        std::vector<VkPipeline> variants = std::vector<VkPipeline>{bhvPipeline, kdPipeline, simpleLoopPipeline};
+        
+        _rayTracingPipeline = std::make_unique<PipelineObject>(
             _device,
             VK_PIPELINE_BIND_POINT_COMPUTE,
             setLayout,
             descriptorPool, 
-            std::move(descriptorSets),
+            descriptorSets,
             pipelineLayout,
-            computePipeline
+            variants
         );
     }
 
@@ -375,12 +429,15 @@ namespace TracerCore
         }
 
         //Run compute pipeline
-        _computeTexture->TransitionImageLayout(VK_IMAGE_LAYOUT_GENERAL);
-        auto cmdBuffer = _device.BeginSingleTimeCommands();
-        _computePipeline->Bind(cmdBuffer, imageIndex);
-        vkCmdDispatch(cmdBuffer, glm::ceil( _computeTexture->GetWidth() / 32.0f), glm::ceil(_computeTexture->GetHeight() / 32.0f), 1);
-        _device.EndSingleTimeCommands(cmdBuffer);
-        _computeTexture->TransitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        {
+            ZoneScopedN("ComputeRays");
+            _computeTexture->TransitionImageLayout(VK_IMAGE_LAYOUT_GENERAL);
+            auto cmdBuffer = _device.BeginSingleTimeCommands();
+            _rayTracingPipeline->Bind(cmdBuffer, imageIndex);
+            vkCmdDispatch(cmdBuffer, glm::ceil( _computeTexture->GetWidth() / 32.0f), glm::ceil(_computeTexture->GetHeight() / 32.0f), 1);
+            _device.EndSingleTimeCommands(cmdBuffer);
+            _computeTexture->TransitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
 
         vkResetCommandBuffer(_commandBuffers[imageIndex], 0);
         RecordCommandBuffer(imageIndex);
@@ -431,6 +488,7 @@ namespace TracerCore
         _uiLayer->Init(&_mainWindow, _swapChain.get());
         _uiLayer->AddLayer(std::make_unique<UI::CamerUIControl>(_camera, _mainWindow));
         _uiLayer->AddLayer(std::make_unique<UI::StatisticsWindow>(_frameStats));
+        _uiLayer->AddLayer(std::make_unique<UI::FrameControllsUI>(_device, _mainWindow, _sceneData, _computeTexture.get()));
     }
 
     void Tracer::RecordCommandBuffer(int index)

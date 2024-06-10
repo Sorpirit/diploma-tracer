@@ -1,10 +1,14 @@
 #include "BHVTree.hpp"
 
+#include <iostream>
+
 namespace TracerCore::AccelerationStructures
 {
-    BHVTree::BHVTree(VulkanDevice &_device, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices) : 
-        AccelerationStructure(_device, vertices, indices)
+    BHVTree::BHVTree(VulkanDevice &_device, AccHeruishitcType accHeruishitcType, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices) : 
+        AccelerationStructure(_device, vertices, indices), _accHeruishitcType(accHeruishitcType)
     {
+        std::cout << "Building BHV Tree, Heruishitc " << (int) _accHeruishitcType << std::endl;
+
         std::vector<uint32_t> indicesCopy;
         indicesCopy.insert(indicesCopy.begin(), indices.begin(), indices.end()); 
 
@@ -121,35 +125,34 @@ namespace TracerCore::AccelerationStructures
 
     bool BHVTree::FindBestSplitPosition(const BHVNode& node, std::vector<glm::vec3> allCentroids, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices, float& bestCost, uint32_t& bestSplitAxis, float& bestSplitPos)
     {
-        // SAH Full
-        // {
-        //     float parentCost = CalculateSAHNodeCost(node);
+        bestSplitAxis = 0;
+        bestCost = FLT_MAX;
+        bestSplitPos = 0.0f;
 
-        //     for (uint32_t axis = 0; axis < 3; axis++)
-        //     {
-        //         for (uint32_t j = 0; j < node.indeciesCount; j+=3)
-        //         {
-        //             uint32_t currentIndecie = node.nextIndex + j;
-        //             glm::vec3 triCenter = allCentroids[currentIndecie / 3];
+        switch (_accHeruishitcType)
+        {
+        case AccHeruishitcType::AccHeruishitc_Primitive:
+        {
+            if(node.indeciesCount <= 32)
+            {
+                return false;
+            }
 
-        //             float splitPos = triCenter[axis];
-        //             float cost = CalculateSAH(node, axis, splitPos, bestCost, allCentroids, vertices, indices);
-        //             if(cost < bestCost)
-        //             {
-        //                 bestCost = cost;
-        //                 bestSplitAxis = axis;
-        //                 bestSplitPos = splitPos;
-        //             }
-        //         }
-        //     }
+            glm::vec3 aabbSize = node.aabbMax - node.aabbMin;
+            bestSplitAxis = 0;
+            if(aabbSize.y > aabbSize.x && aabbSize.y > aabbSize.z)
+            {
+                bestSplitAxis = 1;
+            }
+            else if(aabbSize.z > aabbSize.x && aabbSize.z > aabbSize.y)
+            {
+                bestSplitAxis = 2;
+            }
 
-        //     if(bestCost >= parentCost)
-        //     {
-        //         return false;
-        //     }
-        // }
-
-        // SAH Scaled aproximation
+            bestSplitPos = node.aabbMin[bestSplitAxis] + aabbSize[bestSplitAxis] * 0.5f;
+            break;
+        }
+        case AccHeruishitcType::AccHeruishitc_SAH:
         {
             if(node.indeciesCount <= 32)
             {
@@ -231,28 +234,11 @@ namespace TracerCore::AccelerationStructures
             {
                 return false;
             }
+            break;
         }
-        
-        //Prmitive
-        // {
-        //     if(node.indeciesCount <= 32)
-        //     {
-        //         return false;
-        //     }
-
-        //     glm::vec3 aabbSize = node.aabbMax - node.aabbMin;
-        //     bestSplitAxis = 0;
-        //     if(aabbSize.y > aabbSize.x && aabbSize.y > aabbSize.z)
-        //     {
-        //         bestSplitAxis = 1;
-        //     }
-        //     else if(aabbSize.z > aabbSize.x && aabbSize.z > aabbSize.y)
-        //     {
-        //         bestSplitAxis = 2;
-        //     }
-
-        //     bestSplitPos = node.aabbMin[bestSplitAxis] + aabbSize[bestSplitAxis] * 0.5f;
-        // }
+        default:
+            break;
+        }
 
         return true;
     }

@@ -6,6 +6,12 @@
 
 bool TreverseScene(ray ray, float tMin, inout float tMax, inout HitResult hitResult) 
 {
+    float tStart = tMin;
+    float tEnd = tMax;
+    AABB rootAABB = AABB(sceneData.aabbMin, sceneData.aabbMax);
+    if(!hitAABB(rootAABB, ray, tStart, tEnd) || tStart > tMax) 
+        return false;
+
     bool hit = false;
     HitResult currentHit;
     for(int i = 0; i < indecies.length(); i+= 3)

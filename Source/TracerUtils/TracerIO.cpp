@@ -1,6 +1,8 @@
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "TracerIO.hpp"
 
+#include <iostream>
 #include <fstream>
 #include <stdexcept>
 
@@ -42,6 +44,11 @@ namespace TracerUtils
         return pixels;
     }
 
+    void IOHelpers::SaveImage(const std::string &filePath, stbi_uc *image, int width, int height, int channels)
+    {
+        stbi_write_png(filePath.c_str(), width, height, channels, image, width * channels);
+    }
+
     void IOHelpers::FreeImage(stbi_uc *image)
     {
         stbi_image_free(image);
@@ -52,11 +59,17 @@ namespace TracerUtils
         Models::TracerMesh mesh;
         Assimp::Importer importer;
 
-        auto strPath = (_assetFolder / std::filesystem::path(filePath)).string();
-        const aiScene* scene = importer.ReadFile(strPath, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
+        std::filesystem::path path = filePath;
+        if(!path.is_absolute())
+        {
+            path = (_assetFolder / filePath).string();
+        }
+        
+        const aiScene* scene = importer.ReadFile(path.string(), aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
 
         std::vector<const aiMesh*> meshes;
         VisitNode(scene->mRootNode, scene, &meshes);
+        std::cout << "Loaded model: " << filePath << " with " << meshes.size() << " meshes" << std::endl;
         for (size_t i = 0; i < meshes.size(); i++)
         {
             ImportMesh(meshes[i], mesh);
@@ -82,17 +95,17 @@ namespace TracerUtils
 
     void IOHelpers::ImportMesh(const aiMesh* mesh, Models::TracerMesh& tracerMesh)
     {
-        uint32_t indexOffset = tracerMesh.Vertices.size();
-
+        Models::TracerMeshPart part;
         for (size_t i = 0; i < mesh->mNumVertices; i++)
         {
             Models::TracerVertex vertex;
             vertex.Position = glm::vec3(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
             vertex.Normal = glm::vec3(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
+            vertex.MaterialFlag = 1;
             //TODO fix texture import
             //vertex.TextureCoordinate = glm::vec2(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y); 
 
-            tracerMesh.Vertices.push_back(vertex);
+            part.Vertices.push_back(vertex);
         }
 
         for (size_t i = 0; i < mesh->mNumFaces; i++)
@@ -100,8 +113,10 @@ namespace TracerUtils
             auto face = mesh->mFaces[i];
             for (size_t j = 0; j < face.mNumIndices; j++)
             {
-                tracerMesh.Indices.push_back(indexOffset + face.mIndices[j]);
+                part.Indices.push_back(face.mIndices[j]);
             }
         }
+
+        tracerMesh.Parts.push_back(part);
     }
 }

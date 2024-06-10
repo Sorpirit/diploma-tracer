@@ -5,6 +5,7 @@
 #include <VulkanDevice.hpp>
 #include <Models/TracerVertex.hpp>
 #include <Resources/VulkanBuffer.hpp>
+#include "../TracerScene.hpp"
 
 #include <glm/glm.hpp>
 #include <vector>
@@ -60,7 +61,7 @@ namespace TracerCore::AccelerationStructures
     class KdTree : public AccelerationStructure
     {
     public:
-        KdTree(VulkanDevice& _device, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices);
+        KdTree(VulkanDevice& _device, AccHeruishitcType accHeruishitcType, std::vector<TracerUtils::Models::TracerVertex>& vertices, std::vector<uint32_t>& indices);
         ~KdTree() override;
 
         KdTree(const KdTree&) = delete;
@@ -91,6 +92,8 @@ namespace TracerCore::AccelerationStructures
             float &bestSplitPos
         );
         float CalculateSAHNodeCost(const KdNode &node, const KdTreeBounds &nodeBounds);
+
+        const AccHeruishitcType _accHeruishitcType;
 
         std::unique_ptr<Resources::VulkanBuffer> _nodesBuffer;
         std::unique_ptr<Resources::VulkanBuffer> _indecieBuffer;

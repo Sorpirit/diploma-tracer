@@ -18,6 +18,10 @@ vec3 hash3() {
     return vec3(hash1(), hash1(), hash1());
 }
 
+vec2 hash2() {
+    return vec2(hash1(), hash1());
+}
+
 float hash1(float min, float max) {
     return hash1() * (max - min) + min;
 }
@@ -29,6 +33,13 @@ vec3 hash3(float min, float max) {
 vec3 inUnitSphere(){
     while(true) {
         vec3 p = hash3(-1, 1);
+        if(dot(p,p) < 1) return p;
+    }
+}
+
+vec3 inUnitDisk() {
+    while(true) {
+        vec3 p = vec3(hash1(-1, 1), hash1(-1, 1), 0);
         if(dot(p,p) < 1) return p;
     }
 }

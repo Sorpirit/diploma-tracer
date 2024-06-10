@@ -19,6 +19,7 @@
 #include "TracerCamera.hpp"
 #include "TracerIO.hpp"
 #include "UI/StatisicUILayer.hpp"
+#include "UI/FrameControllsUI.hpp"
 #include "TracerScene.hpp"
 
 namespace TracerCore
@@ -37,6 +38,10 @@ namespace TracerCore
         alignas(4) uint32_t AccumFrameIndex; 
 
         alignas(4) uint32_t BounceCount;
+
+        alignas(4) float DefocusDiskAngle;
+        alignas(4) float DefocusDiskU;
+        alignas(4) float DefocusDiskV;
 
         //scene data
         alignas(16) glm::vec3 aabbMin;
@@ -59,6 +64,7 @@ namespace TracerCore
     private:
         void LoadModels();
         void LoadImages();
+        void SwitchRaytracePipeline();
         void CreateBuffers();
         
         void CreateOnScreenPipelines();
@@ -77,11 +83,11 @@ namespace TracerCore
 
         TracerScene _scene{_device};
 
-        Raytracer _raytracer;
-
         TracerCamera _camera;
+        UI::SceneData _sceneData;
         FrameData _frameData;
         UI::FrameStatisics _frameStats;
+        MaterialsSettings _materialsSettings;
         void* _frameDataPtr;
 
         std::unique_ptr<SwapChain> _swapChain;
@@ -98,7 +104,7 @@ namespace TracerCore
         std::unique_ptr<Resources::VulkanBuffer> _triangleBuffer;
 
         std::unique_ptr<PipelineObject> _graphicsPipeline;
-        std::unique_ptr<PipelineObject> _computePipeline;
+        std::unique_ptr<PipelineObject> _rayTracingPipeline;
     };
     
 }

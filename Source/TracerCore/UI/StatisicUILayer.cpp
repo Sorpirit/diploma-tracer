@@ -26,7 +26,6 @@ namespace TracerCore::UI
         ImGui::Text(triCount.c_str());
         ImGui::ColorEdit4("Sky Color", glm::value_ptr(_stats.color));
         ImGui::SliderInt("Bounce count", &_stats.bounceCount, 2, 16);
-        ImGui::Combo("Model", &_stats.renderModel, _stats.models, _stats.moderlsCount);
         ImGui::End();
     }
 }

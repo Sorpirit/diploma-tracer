@@ -1,12 +1,15 @@
 #include "KdTree.hpp"
 #include <algorithm>
+#include "iostream"
 
 
 namespace TracerCore::AccelerationStructures
 {
-    KdTree::KdTree(VulkanDevice &_device, std::vector<TracerUtils::Models::TracerVertex> &vertices, std::vector<uint32_t> &indices) 
-        : AccelerationStructure(_device, vertices, indices)
+    KdTree::KdTree(VulkanDevice &_device, AccHeruishitcType accHeruishitcType, std::vector<TracerUtils::Models::TracerVertex> &vertices, std::vector<uint32_t> &indices) 
+        : AccelerationStructure(_device, vertices, indices), _accHeruishitcType(accHeruishitcType)
     {
+        std::cout << "Building Kd Tree, Heruishitc " << (int) _accHeruishitcType << std::endl;
+
         //Compute bounds
         std::vector<KdTreeBounds> bounds;
         std::vector<uint32_t> primitiveIndices;
@@ -58,7 +61,6 @@ namespace TracerCore::AccelerationStructures
         const std::vector<uint32_t>* primitiveIndices,
         uint32_t depth)
     {
-        
         uint32_t splitAxis = -1;
         float splitPos = 0.0f;
         float bestCost = FLT_MAX;
@@ -160,7 +162,29 @@ namespace TracerCore::AccelerationStructures
         bestCost = FLT_MAX;
         bestSplitPos = 0.0f;
 
-        //SHA cost
+        switch (_accHeruishitcType)
+        {
+        case AccHeruishitcType::AccHeruishitc_Primitive:
+        {
+            if(node.indeciesCount <= 32)
+            {
+                return false;
+            }
+
+            glm::vec3 aabbSize = nodeBounds.aabbMax - nodeBounds.aabbMin;
+            if(aabbSize.y > aabbSize.x && aabbSize.y > aabbSize.z)
+            {
+                bestSplitAxis = 1;
+            }
+            else if(aabbSize.z > aabbSize.x && aabbSize.z > aabbSize.y)
+            {
+                bestSplitAxis = 2;
+            }
+
+            bestSplitPos = nodeBounds.aabbMin[bestSplitAxis] + aabbSize[bestSplitAxis] * 0.5f;
+            break;
+        }
+        case AccHeruishitcType::AccHeruishitc_SAH:
         {
             if(node.indeciesCount <= 32)
             {
@@ -229,27 +253,11 @@ namespace TracerCore::AccelerationStructures
             {
                 return false;
             }
+            break;
         }
-
-        //Primitive split
-        // {
-        //     if(node.indeciesCount <= 32)
-        //     {
-        //         return false;
-        //     }
-
-        //     glm::vec3 aabbSize = nodeBounds.aabbMax - nodeBounds.aabbMin;
-        //     if(aabbSize.y > aabbSize.x && aabbSize.y > aabbSize.z)
-        //     {
-        //         bestSplitAxis = 1;
-        //     }
-        //     else if(aabbSize.z > aabbSize.x && aabbSize.z > aabbSize.y)
-        //     {
-        //         bestSplitAxis = 2;
-        //     }
-
-        //     bestSplitPos = nodeBounds.aabbMin[bestSplitAxis] + aabbSize[bestSplitAxis] * 0.5f;
-        // }
+        default:
+            break;
+        }
 
         return true;
     }

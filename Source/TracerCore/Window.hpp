@@ -17,10 +17,11 @@ namespace TracerCore
         Window(const Window&) = delete;
         Window &operator=(const Window&) = delete;
 
-        inline bool ShouldClose() { return !glfwWindowShouldClose(_window); };
-        inline VkExtent2D GetExtent() { return {static_cast<uint32_t>(_width), static_cast<uint32_t>(_height)}; };
-        inline bool FramebufferResized() { return _framebufferResized; };
+        inline bool ShouldClose() const { return !glfwWindowShouldClose(_window); };
+        inline VkExtent2D GetExtent() const { return {static_cast<uint32_t>(_width), static_cast<uint32_t>(_height)}; };
+        inline bool FramebufferResized() const { return _framebufferResized; };
         inline void ResetFramebufferResizedFlag() { _framebufferResized = false; };
+        inline GLFWwindow* GetGLFWWindow() const { return _window; };
 
         inline void LockCursor() {
             if(_isCursorLocked)

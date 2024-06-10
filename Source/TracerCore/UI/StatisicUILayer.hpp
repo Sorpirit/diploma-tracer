@@ -20,9 +20,6 @@ namespace TracerCore::UI
         //todo remove
         glm::vec3 color; 
         int bounceCount;
-        int renderModel;
-        int moderlsCount;
-        const char* models[3];
     };
 
     class StatisticsWindow : public RenderUILayer

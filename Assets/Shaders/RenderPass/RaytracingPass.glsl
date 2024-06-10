@@ -18,7 +18,15 @@ layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 layout(binding = 0, rgba8) uniform writeonly image2D resultImage;
 layout(binding = 1, rgba32f) uniform image2D accumulationTexture;
 
+struct Material
+{
+    vec3 albedo;
+    float fuzz;
+};
 
+layout(binding = 6, std140) readonly buffer MaterialsBuffer{
+    Material materials[];
+};
 
 vec3 ray_refract(vec3 rayDirection, vec3 surfaceNormal, float etai_over_etat) {
     float cos_theta = min(dot(-rayDirection, surfaceNormal), 1.0);
@@ -36,51 +44,65 @@ float reflectance(float cosine, float refraction_index) {
 
 void Scater(HitResult hit, inout ray ray, inout vec3 attenuation)
 {
-    switch(hit.materialFlag)
-    {
-        //lambertian
-        case 0:
-            attenuation *= vec3(0.8, 0.8, 0.0); //albedo
-            ray.origin = hit.hitPoint + hit.normal * 0.01;
-            ray.direction = hit.normal + randomUnitVector();
-            if(dot(ray.direction, hit.normal) < 0.0001) 
-                ray.direction = hit.normal;
-            break;
+    Material material = materials[hit.materialFlag];
+    attenuation *= material.albedo;
+    ray.origin = hit.hitPoint + hit.normal * 0.01;
+    vec3 reflected = material.fuzz < 1 ? normalize(reflect(ray.direction, hit.normal)) : hit.normal;
+    ray.direction = reflected + material.fuzz * randomUnitVector();
+    if(dot(ray.direction, hit.normal) < 0.0001) 
+        ray.direction = hit.normal;
+    
+    // switch(hit.materialFlag)
+    // {
+    //     //lambertian
+    //     case 0:
+    //         attenuation *= vec3(0.8, 0.8, 0.0); //albedo
+    //         ray.origin = hit.hitPoint + hit.normal * 0.01;
+    //         ray.direction = hit.normal + randomUnitVector();
+    //         if(dot(ray.direction, hit.normal) < 0.0001) 
+    //             ray.direction = hit.normal;
+    //         break;
 
-        //metal            
-        case 1:
-            float fuzz = 0.8;
-            attenuation *= vec3(0.83, 0.65, 0.92); //albedo
-            // ray.origin = hit.hitPoint + hit.normal * 0.01;
-            // ray.direction = normalize(reflect(ray.direction, hit.normal)) + fuzz * randomUnitVector();
+    //     //metal            
+    //     case 1:
+    //         float fuzz = 0.8;
+    //         attenuation *= vec3(0.83, 0.65, 0.92); //albedo
+    //         // ray.origin = hit.hitPoint + hit.normal * 0.01;
+    //         // ray.direction = normalize(reflect(ray.direction, hit.normal)) + fuzz * randomUnitVector();
 
-            //attenuation *= vec3(0.8, 0.8, 0.0); //albedo
-            ray.origin = hit.hitPoint + hit.normal * 0.01;
-            ray.direction = hit.normal + randomUnitVector();
-            if(dot(ray.direction, hit.normal) < 0.0001) 
-                ray.direction = hit.normal;
-            break;
+    //         //attenuation *= vec3(0.8, 0.8, 0.0); //albedo
+    //         ray.origin = hit.hitPoint + hit.normal * 0.01;
+    //         ray.direction = hit.normal + randomUnitVector();
+    //         if(dot(ray.direction, hit.normal) < 0.0001) 
+    //             ray.direction = hit.normal;
+    //         break;
 
-        //glass
-        case 2:
-            float refractionIndex = 1.0 / 1.33;
-            //attenuation not changed
-            ray.origin = hit.hitPoint;
+    //     //glass
+    //     case 2:
+    //         float refractionIndex = 1.0 / 1.33;
+    //         //attenuation not changed
+    //         ray.origin = hit.hitPoint;
 
-            float ri = hit.frontFace ? 1.0 / refractionIndex : refractionIndex;
-            vec3 unitDir = normalize(ray.direction);
-            float cosTheta = min(dot(-unitDir, hit.normal), 1.0);
-            float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+    //         float ri = hit.frontFace ? 1.0 / refractionIndex : refractionIndex;
+    //         vec3 unitDir = normalize(ray.direction);
+    //         float cosTheta = min(dot(-unitDir, hit.normal), 1.0);
+    //         float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
 
-            bool cannotRefract = ri * sinTheta > 1.0;
-            vec3 direction = cannotRefract || reflectance(cosTheta, ri) > hash1() ? reflect(unitDir, hit.normal) : ray_refract(unitDir, hit.normal, ri);
-            ray.direction = direction;
-        break;
-    }
+    //         bool cannotRefract = ri * sinTheta > 1.0;
+    //         vec3 direction = cannotRefract || reflectance(cosTheta, ri) > hash1() ? reflect(unitDir, hit.normal) : ray_refract(unitDir, hit.normal, ri);
+    //         ray.direction = direction;
+    //     break;
+    // }
 }
+
+vec3 DefocusDiscSample()
+{
+    return inUnitDisk() * vec3(sceneData.defoucsDiskU, sceneData.defoucsDiskV, 0.0);
+}
+
 vec3 GetRayDirection(vec2 screenCord)
 {
-    vec4 target = sceneData.camInvProjection * vec4(screenCord, 1.0, 1.0);
+    vec4 target = sceneData.camInvProjection * (vec4(screenCord, 1.0, 1.0));
     vec3 dir = vec3(sceneData.camInvView * vec4(normalize(vec3(target.xyz / target.w)), 0.0));
     return normalize(dir);
 }
@@ -155,6 +177,11 @@ void main()
     gState *= floatBitsToUint(uv.y * uv.x / 1000) * textureCoord.x * sceneData.frameIndex;
 
     vec3 origin = sceneData.camInvView[3].xyz;
+
+    // if(sceneData.defoucsDiskAngle > 0)
+    // {
+    //     origin += DefocusDiscSample();
+    // }
 
     //anti aliasing
     uint samplesPerPixel = 1;
