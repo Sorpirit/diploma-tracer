@@ -17,7 +17,7 @@ namespace TracerCore::UI
 
     void FrameControllsUI::Render()
     {
-        ImGui::Begin("Frame Controlls");
+        ImGui::Begin("Scene Controlls");
 
         if(ImGui::Button("Load Model..."))
         {

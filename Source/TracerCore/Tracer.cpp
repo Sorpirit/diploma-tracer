@@ -169,6 +169,7 @@ namespace TracerCore
             {
                 SwitchRaytracePipeline();
                 LoadModels();
+                _camera.SetStatic(false);
             }
 
             if(_sceneData.ResetCamera)
@@ -177,6 +178,7 @@ namespace TracerCore
                 glm::vec3 target = glm::vec3(0, .5, 0);
                 _camera.SetParameters(position, glm::normalize(target - position));
                 _sceneData.ResetCamera = false;
+                _camera.SetStatic(false);
             }
 
             frameCount++;

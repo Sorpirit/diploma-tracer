@@ -35,16 +35,31 @@ namespace UI
 
         bool allowMoving = ImGui::IsMouseDown(ImGuiMouseButton_Right);
 
-        if(allowMoving)
+        if(_allowMoving != allowMoving)
         {
-            _window.LockCursor();
-            _camera.SetStatic(false);
+            _allowMoving = allowMoving;
+            if(allowMoving)
+            {
+                _window.LockCursor();
+                _camera.SetStatic(false);
+            }
+            else
+            {
+                _window.UnlockCursor();
+                _camera.SetStatic(true);
+            }
         }
-        else
-        {
-            _window.UnlockCursor();
-            _camera.SetStatic(true);
-        }
+
+        // if(allowMoving)
+        // {
+        //     _window.LockCursor();
+        //     _camera.SetStatic(false);
+        // }
+        // else
+        // {
+        //     _window.UnlockCursor();
+        //     _camera.SetStatic(true);
+        // }
 
         if (!ImGui::IsItemFocused() && allowMoving) 
         {

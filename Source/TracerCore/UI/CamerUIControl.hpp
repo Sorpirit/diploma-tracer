@@ -20,6 +20,7 @@ namespace UI
         Window& _window;
 
         glm::vec2 _lastMousePos;
+        bool _allowMoving = false;
   };
   
 

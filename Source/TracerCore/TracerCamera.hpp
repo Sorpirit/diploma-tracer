@@ -45,7 +45,7 @@ namespace TracerCore
         glm::mat4x4 _invProjection;
         glm::mat4x4 _invView;   
 
-        bool _staticFlag; 
+        bool _staticFlag = false; 
 
         void UpdateProjection();
         void UpdateView();     
